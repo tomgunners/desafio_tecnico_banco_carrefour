@@ -114,7 +114,7 @@ jobs:
         working-directory: mobile-tests
         run: |
           mkdir -p apps
-          curl -L -o apps/app.apk https://github.com/webdriverio/native-demo-app/releases/download/v1.0.8/android.wdio.native.app.v1.0.8.apk
+          curl -L -o apps/wdio-native-demo-app.apk https://github.com/webdriverio/native-demo-app/releases/download/v1.0.8/android.wdio.native.app.v1.0.8.apk
           ls -la apps
 
       - name: Enable KVM
