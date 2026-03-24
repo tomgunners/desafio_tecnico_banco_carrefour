@@ -10,14 +10,13 @@ on:
 env:
   NODE_VERSION: '22'
 
-# Cancela execuções anteriores ainda em andamento para a mesma branch/PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   # ─────────────────────────────────────────────
-  # JOB 1 – Testes de API
+  # JOB 1 – Testes de API (MANTIDO EXATAMENTE)
   # ─────────────────────────────────────────────
   api-tests:
     name: API Tests
@@ -72,7 +71,7 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────
-  # JOB 2 – Testes Mobile Android (Appium + Docker)
+  # JOB 2 – ANDROID (AJUSTADO)
   # ─────────────────────────────────────────────
   mobile-android:
     name: Mobile Tests – Android
@@ -111,18 +110,39 @@ jobs:
             cp .env.example .env
           fi
 
-      - name: Enable KVM (hardware acceleration for Android emulator)
+      # 🔥 NOVO – garante APK
+      - name: Validate APK exists
+        run: |
+          ls -la mobile-tests/apps || true
+          if [ ! -f mobile-tests/apps/wdio-native-demo-app.apk ]; then
+            echo "❌ APK não encontrado"
+            exit 1
+          fi
+
+      - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Start Appium server via Docker Compose
+      - name: Start Docker Compose
         working-directory: mobile-tests
+        run: docker compose up -d
+
+      # 🔥 CORREÇÃO CRÍTICA (resolve seu erro)
+      - name: Wait for emulator boot
         run: |
-          docker compose up -d
-          node scripts/wait-for-appium.js
+          adb wait-for-device
+          until adb shell getprop sys.boot_completed | grep -m 1 '1'; do
+            echo "⏳ aguardando boot..."
+            sleep 5
+          done
+          adb shell input keyevent 82
+
+      - name: Wait for Appium
+        working-directory: mobile-tests
+        run: node scripts/wait-for-appium.js
 
       - name: Run Android tests
         working-directory: mobile-tests
@@ -141,11 +161,9 @@ jobs:
           path: |
             mobile-tests/allure-results/
             mobile-tests/reports/
-          if-no-files-found: warn
-          retention-days: 7
 
   # ─────────────────────────────────────────────
-  # JOB 3 – Testes Mobile iOS (Appium + Simulator)
+  # JOB 3 – iOS (AJUSTADO)
   # ─────────────────────────────────────────────
   mobile-ios:
     name: Mobile Tests – iOS
@@ -189,11 +207,23 @@ jobs:
           yarn global add appium
           appium driver install xcuitest
 
+      # 🔥 NOVO – garante simulator pronto
+      - name: Boot iOS Simulator
+        run: |
+          DEVICE="iPhone 15"
+          UDID=$(xcrun simctl list devices | grep "$DEVICE (" | head -n 1 | awk -F '[()]' '{print $2}')
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+
       - name: Start Appium server
         working-directory: mobile-tests
         run: |
           appium &
-          node scripts/wait-for-appium.js
+          sleep 10
+
+      - name: Wait for Appium
+        working-directory: mobile-tests
+        run: node scripts/wait-for-appium.js
 
       - name: Run iOS tests
         working-directory: mobile-tests
@@ -207,5 +237,3 @@ jobs:
           path: |
             mobile-tests/allure-results/
             mobile-tests/reports/
-          if-no-files-found: warn
-          retention-days: 7
