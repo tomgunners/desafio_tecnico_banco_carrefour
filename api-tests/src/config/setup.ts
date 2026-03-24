@@ -2,6 +2,13 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { fileURLToPath } from 'url';
+
+// ✅ FIX para ESM (Node 22)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ── ENV ───────────────────────────────────────────────────────────────────────
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
