@@ -37,7 +37,7 @@
 
 services:
   android:
-    image: budtmo/docker-android:emulator_14.0
+    image: budtmo/docker-android:emulator_15.0
     container_name: mobile-tests-android-1   # nome fixo para o docker exec funcionar
     privileged: true
     ports:
