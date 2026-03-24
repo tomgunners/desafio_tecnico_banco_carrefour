@@ -25,7 +25,7 @@ export const config: Options.Testrunner = {
 
     // Local  : versão do emulador/dispositivo físico (adb shell getprop ro.build.version.release)
     // CI     : versão da imagem docker-android (ex: emulator_15 → '15)
-    'appium:platformVersion': process.env.ANDROID_PLATFORM_VERSION ?? '15',
+    'appium:platformVersion': process.env.ANDROID_PLATFORM_VERSION ?? '14',
 
     // Serial do emulador — docker-android expõe sempre como emulator-5554
     'appium:deviceName': process.env.ANDROID_DEVICE_NAME ?? 'emulator-5554',
