@@ -1,0 +1,188 @@
+name: Mobile Tests — Banco Carrefour
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'mobile-tests/**'
+      - '.github/workflows/mobile-tests.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'mobile-tests/**'
+      - '.github/workflows/mobile-tests.yml'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  WORKING_DIR: mobile-tests
+  # Imagem docker-android: emulator_14.0 = Android 14 (API 34)
+  DOCKER_ANDROID_IMAGE: budtmo/docker-android:emulator_14.0
+  # Path do APK dentro do container (volume montado de mobile-tests/apps/)
+  ANDROID_APP_CONTAINER_PATH: /apps/wdio-native-demo-app.apk
+  # URL pública do APK de demonstração do WebdriverIO
+  APK_DOWNLOAD_URL: https://github.com/webdriverio/native-demo-app/releases/latest/download/Android-NativeDemoApp.apk
+
+jobs:
+  mobile-tests:
+    name: Mobile Tests — Android (docker-android)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    defaults:
+      run:
+        working-directory: ${{ env.WORKING_DIR }}
+
+    steps:
+      # ── Checkout ─────────────────────────────────────────────────────────────
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      # ── KVM (necessário para o emulador Android) ──────────────────────────────
+      # Os runners ubuntu-latest do GitHub Actions suportam KVM (nested virt.)
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      # ── Node.js ───────────────────────────────────────────────────────────────
+      - name: Configurar Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
+
+      - name: Instalar dependências
+        run: npm install
+
+      # ── APK ───────────────────────────────────────────────────────────────────
+      - name: Baixar APK do app de demonstração
+        run: |
+          mkdir -p apps
+          curl -L "${{ env.APK_DOWNLOAD_URL }}" -o apps/wdio-native-demo-app.apk
+          ls -lh apps/
+
+      # ── docker-android ────────────────────────────────────────────────────────
+      # Sobe o container com emulador Android 14 + Appium 2 embutidos.
+      # O volume ./apps é montado em /apps dentro do container —
+      # o capabilities appium:app aponta para /apps/wdio-native-demo-app.apk.
+      - name: Iniciar container docker-android
+        run: |
+          docker run -d \
+            --name android-container \
+            --privileged \
+            -p 4723:4723 \
+            -p 5555:5555 \
+            -p 6080:6080 \
+            -e EMULATOR_DEVICE="Samsung Galaxy S10" \
+            -e APPIUM=true \
+            -e WEB_VNC=false \
+            --device /dev/kvm \
+            -v ${{ github.workspace }}/${{ env.WORKING_DIR }}/apps:/apps \
+            ${{ env.DOCKER_ANDROID_IMAGE }}
+
+      # ── Aguardar emulador + Appium ────────────────────────────────────────────
+      # Polling no endpoint /status do Appium até a resposta ser 200.
+      # O script encerra com erro se não responder em 3 minutos.
+      - name: Aguardar Appium ficar disponível
+        run: node scripts/wait-for-appium.js
+        env:
+          APPIUM_HOST: 127.0.0.1
+          APPIUM_PORT: 4723
+          WAIT_TIMEOUT: 180000
+
+      # ── Aguardar boot completo + executar testes ──────────────────────────────
+      # docker-test.js:
+      #   1. Aguarda sys.boot_completed via docker exec (emulador pronto)
+      #   2. Injeta ANDROID_APP_CONTAINER_PATH no processo do wdio
+      #   3. Executa os testes
+      - name: Aguardar boot do emulador e executar testes mobile
+        working-directory: ${{ env.WORKING_DIR }}
+        run: node scripts/docker-test.js
+        env:
+          DOCKER_CONTAINER_NAME: android-container
+          ANDROID_APP_CONTAINER_PATH: ${{ env.ANDROID_APP_CONTAINER_PATH }}
+          APPIUM_HOST: 127.0.0.1
+          APPIUM_PORT: 4723
+          ANDROID_PLATFORM_VERSION: '14'
+          ANDROID_DEVICE_NAME: emulator-5554
+          APPIUM_COMMAND_TIMEOUT: '300'
+          BOOT_TIMEOUT: '180000'
+          STANDARD_USER: ${{ secrets.MOBILE_STANDARD_USER || 'bob@example.com' }}
+          STANDARD_PASSWORD: ${{ secrets.MOBILE_STANDARD_PASSWORD || '10203040' }}
+          TEST_ENV: CI
+          CI: 'true'
+
+      # ── Logs do container ─────────────────────────────────────────────────────
+      - name: Salvar logs do docker-android
+        if: always()
+        run: docker logs android-container > docker-android.log 2>&1 || true
+
+      - name: Publicar logs do container
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docker-android-logs-${{ github.run_number }}
+          path: ${{ env.WORKING_DIR }}/docker-android.log
+          retention-days: 7
+
+      # ── Screenshots ───────────────────────────────────────────────────────────
+      - name: Publicar screenshots de falhas
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobile-screenshots-${{ github.run_number }}
+          path: ${{ env.WORKING_DIR }}/reports/screenshots/
+          retention-days: 30
+
+      # ── Relatório Allure ──────────────────────────────────────────────────────
+      - name: Instalar Allure CLI
+        if: always()
+        run: npm install -g allure-commandline
+
+      - name: Restaurar histórico do Allure (trend)
+        uses: actions/download-artifact@v4
+        if: always()
+        continue-on-error: true
+        with:
+          name: allure-history-mobile
+          path: ${{ env.WORKING_DIR }}/allure-report/history
+
+      - name: Gerar relatório Allure
+        if: always()
+        run: allure generate allure-results -o allure-report --clean
+
+      - name: Salvar histórico do Allure para próxima execução
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-history-mobile
+          path: ${{ env.WORKING_DIR }}/allure-report/history
+          retention-days: 90
+
+      - name: Publicar relatório Allure
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-report-mobile-${{ github.run_number }}
+          path: ${{ env.WORKING_DIR }}/allure-report/
+          retention-days: 30
+
+      # ── Deploy GitHub Pages ───────────────────────────────────────────────────
+      - name: Deploy do relatório Allure no GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main' && always()
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ${{ env.WORKING_DIR }}/allure-report
+          destination_dir: mobile
+          keep_files: true
+
+      # ── Teardown ──────────────────────────────────────────────────────────────
+      - name: Remover container docker-android
+        if: always()
+        run: docker rm -f android-container || true
