@@ -1,264 +1,182 @@
-name: Test Automation Pipeline
+name: CI – API & Mobile Tests
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - develop
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - develop
   workflow_dispatch:
-    inputs:
-      test_suite:
-        description: 'Qual suíte executar?'
-        required: true
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - web
-          - api
-          - performance
-      web_profile:
-        description: 'Projeto Web E2E'
-        required: false
-        default: 'default'
-        type: choice
-        options:
-          - default
-          - regression
-      perf_mode:
-        description: 'Modo de performance'
-        required: false
-        default: 'gate'
-        type: choice
-        options:
-          - gate        # quebra o pipeline se os thresholds falharem
-          - informative # apenas reporta, nunca quebra
-      perf_profile:
-        description: 'Projeto K6 Performance'
-        required: false
-        default: 'load'
-        type: choice
-        options:
-          - load
-          - spike
-          - soak
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
+
+# Cancela execuções anteriores ainda em andamento para a mesma branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  tests:
-    name: ${{ matrix.name }}
+  # ─────────────────────────────────────────────
+  # JOB 1 – Testes de API
+  # ─────────────────────────────────────────────
+  api-tests:
+    name: API Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: API Tests
-            suite: api
-            path: api-tests
-            script: test:api
-
-          - name: Web Tests (regression)
-            suite: web
-            path: web-tests
-            script: test:web:regression
-
-          - name: Performance Tests
-            suite: performance
-            path: performance-tests
-            script: test:perf
+    defaults:
+      run:
+        working-directory: api-tests
 
     steps:
-      # ─── Checkout ──────────────────────────────────────────────────────────
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ─── Setup Node.js ──────────────────────────────────────────────────────
-      - name: Setup Node.js
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'yarn'
+          cache: 'npm'
+          cache-dependency-path: api-tests/package-lock.json
 
-      # ─── Cache node_modules ─────────────────────────────────────────────────
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        id: cache-node-modules
-        with:
-          path: |
-            node_modules
-            ${{ matrix.path }}/node_modules
-          key: ${{ matrix.suite }}-node-modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            ${{ matrix.suite }}-node-modules-${{ runner.os }}-
+      - name: Install dependencies
+        run: npm ci
 
-      # ─── Instalar dependências ───────────────────────────────────────────────
-      - name: Instalar dependências
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: yarn install --frozen-lockfile
-
-      # ─── Instalar k6 (apenas performance) ───────────────────────────────────
-      - name: Instalar k6
-        if: matrix.suite == 'performance'
+      - name: Copy environment file
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gnupg ca-certificates
-          curl -fsSL https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
-          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
-          sudo apt-get update
-          sudo apt-get install -y k6
-
-      # ─── Cache Playwright browsers (apenas web) ──────────────────────────────
-      - name: Cache Playwright browsers
-        if: matrix.suite == 'web'
-        uses: actions/cache@v4
-        id: cache-playwright
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
-
-      # ─── Instalar browsers do Playwright (apenas web) ────────────────────────
-      - name: Instalar Playwright browsers
-        if: matrix.suite == 'web' && steps.cache-playwright.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      # ─── Instalar Allure CLI (apenas web) ────────────────────────────────────
-      - name: Instalar Allure CLI
-        if: matrix.suite == 'web'
-        run: npm install -g allure-commandline
-
-      # ─── Restaurar allure-report/history (Trend) ─────────────────────────────
-      #
-      # O allure-setup.ts segue o padrão:
-      #   restoreHistory(): copia allure-report/history → allure-results/history
-      #
-      # Por isso cacheamos allure-report/history (a FONTE), não allure-results/history.
-      # Se cacheássemos allure-results/history, o setupAllure() sobrescreveria com
-      # allure-report/history (vazio no CI) — zerando o histórico a cada run.
-      #
-      # actions/cache persiste entre runs:
-      #   key única por run_id → novo cache por execução
-      #   restore-keys sem run_id → restaura sempre o cache mais recente da suite
-      #
-      # Na primeira execução não há cache — o Trend começa a acumular
-      # a partir da segunda execução automaticamente.
-      #
-      - name: Restaurar allure-report/history
-        if: matrix.suite == 'web'
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ matrix.path }}/allure-report/history
-          key: allure-report-history-${{ matrix.suite }}-${{ github.run_id }}
-          restore-keys: |
-            allure-report-history-${{ matrix.suite }}-
-
-      # ─── Executar testes ──────────────────────────────────────────────────────
-      - name: Executar testes
-        if: >
-          github.event.inputs.test_suite == matrix.suite ||
-          github.event.inputs.test_suite == 'all' ||
-          github.event_name != 'workflow_dispatch'
-        run: |
-          if [ "${{ matrix.suite }}" = "performance" ]; then
-            export BASE_URL=https://dummyjson.com
-            MODE="${{ github.event.inputs.perf_mode || 'informative' }}"
-            if [ "$MODE" = "informative" ]; then
-              yarn workspace performance-tests test:informative
-            else
-              yarn workspace performance-tests test:gate
-            fi
-          else
-            yarn ${{ matrix.script }}
+          if [ -f .env.example ]; then
+            cp .env.example .env
           fi
-        env:
-          BASE_URL: https://www.saucedemo.com
-          HEADLESS: 'true'
-          BROWSER: chromium
-          API_BASE_URL: https://dummyjson.com
-          STAGES_PROFILE: ${{ github.event.inputs.perf_profile || 'load' }}
-          # Expostos para o allure-setup.ts popular Environment e Executors
-          GITHUB_RUN_ID:     ${{ github.run_id }}
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
-          GITHUB_WORKFLOW:   ${{ github.workflow }}
-          GITHUB_ACTOR:      ${{ github.actor }}
-          GITHUB_SERVER_URL: ${{ github.server_url }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-          GITHUB_REF_NAME:   ${{ github.ref_name }}
-          REPORT_URL:        https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/allure-report
 
-      # ─── Gerar relatório Allure (apenas web) ─────────────────────────────────
-      - name: Gerar relatório Allure
-        if: always() && matrix.suite == 'web'
-        run: yarn workspace web-tests allure:generate
+      - name: Run API tests
+        run: npm test
 
-      # ─── Salvar allure-report/history para próxima execução (Trend) ──────────
-      # Após o allure generate, allure-report/history/ contém o histórico
-      # atualizado com os dados desta execução.
-      # if: always() garante que o histórico é salvo mesmo quando os testes falham.
-      - name: Salvar allure-report/history
-        if: always() && matrix.suite == 'web'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ matrix.path }}/allure-report/history
-          key: allure-report-history-${{ matrix.suite }}-${{ github.run_id }}
-
-      # ─── Upload de artefatos ─────────────────────────────────────────────────
-      - name: Upload artefatos
+      - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: results-${{ matrix.suite }}-${{ github.run_id }}
+          name: api-test-report-${{ github.run_number }}
           path: |
-            ${{ matrix.path }}/allure-report/**
-            ${{ matrix.path }}/allure-results/**
-            ${{ matrix.path }}/test-results/**
-            ${{ matrix.path }}/reports/**
-            ${{ matrix.path }}/results/**
-          if-no-files-found: warn
-          retention-days: 30
+            api-tests/mochawesome-report/
+            api-tests/reports/
+          retention-days: 7
 
-  # ─── Publish Allure Report no GitHub Pages ───────────────────────────────────
-  publish-allure:
-    name: Publish Allure Report
+  # ─────────────────────────────────────────────
+  # JOB 2 – Testes Mobile Android (Appium + Docker)
+  # ─────────────────────────────────────────────
+  mobile-android:
+    name: Mobile Tests – Android
     runs-on: ubuntu-latest
-    needs: tests
-    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    timeout-minutes: 60
 
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-      deployments: write
+    defaults:
+      run:
+        working-directory: mobile-tests
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Limpar deployments antigos
-        uses: strumwolf/delete-deployment-environment@v3
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          environment: github-pages
-          onlyRemoveDeployments: true
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: mobile-tests/package-lock.json
 
-      - name: Download Allure report (web)
-        uses: actions/download-artifact@v4
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Copy environment file
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          fi
+
+      - name: Enable KVM (hardware acceleration for Android emulator)
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Start Appium server via Docker Compose
+        run: |
+          docker compose up -d
+          node scripts/wait-for-appium.js
+
+      - name: Run Android tests
+        run: npm run test:android
+
+      - name: Stop Docker Compose
+        if: always()
+        run: docker compose down
+
+      - name: Upload Android test report
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          name: results-web-${{ github.run_id }}
-          path: allure-combined
-        continue-on-error: true
+          name: android-test-report-${{ github.run_number }}
+          path: |
+            mobile-tests/allure-results/
+            mobile-tests/reports/
+          retention-days: 7
 
-      - name: Listar arquivos baixados
-        run: find allure-combined -type f | head -30 || echo "Nenhum arquivo encontrado"
+  # ─────────────────────────────────────────────
+  # JOB 3 – Testes Mobile iOS (Appium + Simulator)
+  # ─────────────────────────────────────────────
+  mobile-ios:
+    name: Mobile Tests – iOS
+    runs-on: macos-latest
+    timeout-minutes: 60
 
-      - name: Publish no GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+    defaults:
+      run:
+        working-directory: mobile-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: allure-combined/allure-report
-          destination_dir: allure-report
-          keep_files: false
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: mobile-tests/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Copy environment file
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          fi
+
+      - name: Install Appium and drivers
+        run: |
+          npm install -g appium
+          appium driver install xcuitest
+
+      - name: Start Appium server
+        run: |
+          appium &
+          node scripts/wait-for-appium.js
+
+      - name: Run iOS tests
+        run: npm run test:ios
+
+      - name: Upload iOS test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-report-${{ github.run_number }}
+          path: |
+            mobile-tests/allure-results/
+            mobile-tests/reports/
+          retention-days: 7
