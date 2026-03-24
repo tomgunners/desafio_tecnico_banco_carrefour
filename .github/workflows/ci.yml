@@ -2,13 +2,9 @@ name: CI – API & Mobile Tests
 
 on:
   push:
-    branches:
-      - main
-      - develop
+    branches: [main, develop]
   pull_request:
-    branches:
-      - main
-      - develop
+    branches: [main, develop]
   workflow_dispatch:
 
 env:
@@ -28,10 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    defaults:
-      run:
-        working-directory: api-tests
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -41,18 +33,31 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'yarn'
-          cache-dependency-path: api-tests/yarn.lock
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: cache-node-modules-api
+        with:
+          path: |
+            node_modules
+            api-tests/node_modules
+          key: api-node-modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            api-node-modules-${{ runner.os }}-
 
       - name: Install dependencies
+        if: steps.cache-node-modules-api.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
       - name: Copy environment file
+        working-directory: api-tests
         run: |
           if [ -f .env.example ]; then
             cp .env.example .env
           fi
 
       - name: Run API tests
+        working-directory: api-tests
         run: yarn test
 
       - name: Upload test report
@@ -63,6 +68,7 @@ jobs:
           path: |
             api-tests/mochawesome-report/
             api-tests/reports/
+          if-no-files-found: warn
           retention-days: 7
 
   # ─────────────────────────────────────────────
@@ -73,10 +79,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
-    defaults:
-      run:
-        working-directory: mobile-tests
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,12 +88,24 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'yarn'
-          cache-dependency-path: mobile-tests/yarn.lock
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: cache-node-modules-android
+        with:
+          path: |
+            node_modules
+            mobile-tests/node_modules
+          key: mobile-node-modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            mobile-node-modules-${{ runner.os }}-
 
       - name: Install dependencies
+        if: steps.cache-node-modules-android.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
       - name: Copy environment file
+        working-directory: mobile-tests
         run: |
           if [ -f .env.example ]; then
             cp .env.example .env
@@ -105,15 +119,18 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Start Appium server via Docker Compose
+        working-directory: mobile-tests
         run: |
           docker compose up -d
           node scripts/wait-for-appium.js
 
       - name: Run Android tests
+        working-directory: mobile-tests
         run: yarn test:android
 
       - name: Stop Docker Compose
         if: always()
+        working-directory: mobile-tests
         run: docker compose down
 
       - name: Upload Android test report
@@ -124,6 +141,7 @@ jobs:
           path: |
             mobile-tests/allure-results/
             mobile-tests/reports/
+          if-no-files-found: warn
           retention-days: 7
 
   # ─────────────────────────────────────────────
@@ -134,10 +152,6 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
 
-    defaults:
-      run:
-        working-directory: mobile-tests
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -147,12 +161,24 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'yarn'
-          cache-dependency-path: mobile-tests/yarn.lock
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: cache-node-modules-ios
+        with:
+          path: |
+            node_modules
+            mobile-tests/node_modules
+          key: mobile-node-modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            mobile-node-modules-${{ runner.os }}-
 
       - name: Install dependencies
+        if: steps.cache-node-modules-ios.outputs.cache-hit != 'true'
         run: yarn install --frozen-lockfile
 
       - name: Copy environment file
+        working-directory: mobile-tests
         run: |
           if [ -f .env.example ]; then
             cp .env.example .env
@@ -164,11 +190,13 @@ jobs:
           appium driver install xcuitest
 
       - name: Start Appium server
+        working-directory: mobile-tests
         run: |
           appium &
           node scripts/wait-for-appium.js
 
       - name: Run iOS tests
+        working-directory: mobile-tests
         run: yarn test:ios
 
       - name: Upload iOS test report
@@ -179,4 +207,5 @@ jobs:
           path: |
             mobile-tests/allure-results/
             mobile-tests/reports/
+          if-no-files-found: warn
           retention-days: 7
