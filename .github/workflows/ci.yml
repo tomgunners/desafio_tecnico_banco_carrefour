@@ -73,7 +73,7 @@ jobs:
   # ─────────────────────────────────────────────
   # JOB 2 – ANDROID (CORRIGIDO)
   # ─────────────────────────────────────────────
-    mobile-android:
+  mobile-android:
     name: Mobile Tests – Android
     runs-on: ubuntu-latest
     timeout-minutes: 60
