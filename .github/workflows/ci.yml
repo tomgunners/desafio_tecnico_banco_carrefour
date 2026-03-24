@@ -71,7 +71,7 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────
-  # JOB 2 – ANDROID (AJUSTADO)
+  # JOB 2 – ANDROID (CORRIGIDO)
   # ─────────────────────────────────────────────
   mobile-android:
     name: Mobile Tests – Android
@@ -110,14 +110,13 @@ jobs:
             cp .env.example .env
           fi
 
-      # 🔥 NOVO – garante APK
-      - name: Validate APK exists
+      # 🔥 NOVO – download do APK
+      - name: Download APK
+        working-directory: mobile-tests
         run: |
-          ls -la mobile-tests/apps || true
-          if [ ! -f mobile-tests/apps/wdio-native-demo-app.apk ]; then
-            echo "❌ APK não encontrado"
-            exit 1
-          fi
+          mkdir -p apps
+          curl -L -o apps/app.apk https://github.com/webdriverio/native-demo-app/releases/download/v1.0.8/android.wdio.native.app.v1.0.8.apk
+          ls -la apps
 
       - name: Enable KVM
         run: |
@@ -130,7 +129,6 @@ jobs:
         working-directory: mobile-tests
         run: docker compose up -d
 
-      # 🔥 CORREÇÃO CRÍTICA (resolve seu erro)
       - name: Wait for emulator boot
         run: |
           adb wait-for-device
@@ -163,7 +161,7 @@ jobs:
             mobile-tests/reports/
 
   # ─────────────────────────────────────────────
-  # JOB 3 – iOS (AJUSTADO)
+  # JOB 3 – iOS (PRONTO PRA APP REAL)
   # ─────────────────────────────────────────────
   mobile-ios:
     name: Mobile Tests – iOS
@@ -202,12 +200,18 @@ jobs:
             cp .env.example .env
           fi
 
+      # 🔥 OPCIONAL – download de app iOS (quando tiver um)
+      - name: Prepare iOS app
+        working-directory: mobile-tests
+        run: |
+          mkdir -p apps
+          echo "⚠️ Adicione aqui o download do .app ou .ipa quando disponível"
+
       - name: Install Appium and drivers
         run: |
           yarn global add appium
           appium driver install xcuitest
 
-      # 🔥 NOVO – garante simulator pronto
       - name: Boot iOS Simulator
         run: |
           DEVICE="iPhone 15"
