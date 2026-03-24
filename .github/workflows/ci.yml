@@ -110,7 +110,6 @@ jobs:
             cp .env.example .env
           fi
 
-      # 🔥 NOVO – download do APK
       - name: Download APK
         working-directory: mobile-tests
         run: |
@@ -124,6 +123,13 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+
+      # ✅ CORREÇÃO – instala o adb antes de qualquer uso
+      - name: Install adb
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y android-tools-adb
+          adb version
 
       - name: Start Docker Compose
         working-directory: mobile-tests
@@ -200,7 +206,6 @@ jobs:
             cp .env.example .env
           fi
 
-      # 🔥 OPCIONAL – download de app iOS (quando tiver um)
       - name: Prepare iOS app
         working-directory: mobile-tests
         run: |
