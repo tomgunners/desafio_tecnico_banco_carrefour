@@ -2,23 +2,27 @@ name: CI – API & Mobile Tests
 
 on:
   push:
-    branches: [main, develop]
+    branches:
+      - main
+      - develop
   pull_request:
-    branches: [main, develop]
+    branches:
+      - main
+      - develop
   workflow_dispatch:
 
 env:
   NODE_VERSION: '22'
 
+# Cancela execuções anteriores ainda em andamento para a mesma branch/PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-
-  # ─────────────────────────────
-  # API TESTS
-  # ─────────────────────────────
+  # ─────────────────────────────────────────────
+  # JOB 1 – Testes de API
+  # ─────────────────────────────────────────────
   api-tests:
     name: API Tests
     runs-on: ubuntu-latest
@@ -29,26 +33,29 @@ jobs:
         working-directory: api-tests
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: ./api-tests/package-lock.json
+          cache: 'yarn'
+          cache-dependency-path: api-tests/yarn.lock
 
       - name: Install dependencies
-        run: npm ci
+        run: yarn install --frozen-lockfile
 
-      - name: Copy .env
+      - name: Copy environment file
         run: |
-          [ -f .env.example ] && cp .env.example .env
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          fi
 
       - name: Run API tests
-        run: npm test
+        run: yarn test
 
-      - name: Upload report
+      - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -58,10 +65,9 @@ jobs:
             api-tests/reports/
           retention-days: 7
 
-
-  # ─────────────────────────────
-  # MOBILE ANDROID
-  # ─────────────────────────────
+  # ─────────────────────────────────────────────
+  # JOB 2 – Testes Mobile Android (Appium + Docker)
+  # ─────────────────────────────────────────────
   mobile-android:
     name: Mobile Tests – Android
     runs-on: ubuntu-latest
@@ -72,42 +78,45 @@ jobs:
         working-directory: mobile-tests
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: ./mobile-tests/package-lock.json
+          cache: 'yarn'
+          cache-dependency-path: mobile-tests/yarn.lock
 
       - name: Install dependencies
-        run: npm ci
+        run: yarn install --frozen-lockfile
 
-      - name: Copy .env
+      - name: Copy environment file
         run: |
-          [ -f .env.example ] && cp .env.example .env
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          fi
 
-      - name: Enable KVM
+      - name: Enable KVM (hardware acceleration for Android emulator)
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Start Appium (Docker)
+      - name: Start Appium server via Docker Compose
         run: |
           docker compose up -d
           node scripts/wait-for-appium.js
 
       - name: Run Android tests
-        run: npm run test:android
+        run: yarn test:android
 
-      - name: Stop Docker
+      - name: Stop Docker Compose
         if: always()
         run: docker compose down
 
-      - name: Upload report
+      - name: Upload Android test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -117,10 +126,9 @@ jobs:
             mobile-tests/reports/
           retention-days: 7
 
-
-  # ─────────────────────────────
-  # MOBILE IOS
-  # ─────────────────────────────
+  # ─────────────────────────────────────────────
+  # JOB 3 – Testes Mobile iOS (Appium + Simulator)
+  # ─────────────────────────────────────────────
   mobile-ios:
     name: Mobile Tests – iOS
     runs-on: macos-latest
@@ -131,36 +139,39 @@ jobs:
         working-directory: mobile-tests
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: ./mobile-tests/package-lock.json
+          cache: 'yarn'
+          cache-dependency-path: mobile-tests/yarn.lock
 
       - name: Install dependencies
-        run: npm ci
+        run: yarn install --frozen-lockfile
 
-      - name: Copy .env
+      - name: Copy environment file
         run: |
-          [ -f .env.example ] && cp .env.example .env
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          fi
 
-      - name: Install Appium
+      - name: Install Appium and drivers
         run: |
-          npm install -g appium
+          yarn global add appium
           appium driver install xcuitest
 
-      - name: Start Appium
+      - name: Start Appium server
         run: |
           appium &
           node scripts/wait-for-appium.js
 
       - name: Run iOS tests
-        run: npm run test:ios
+        run: yarn test:ios
 
-      - name: Upload report
+      - name: Upload iOS test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
