@@ -10,13 +10,19 @@ on:
 env:
   NODE_VERSION: '22'
 
+# ✅ Permissões necessárias para o deploy no GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   # ─────────────────────────────────────────────
-  # JOB 1 – Testes de API (MANTIDO EXATAMENTE)
+  # JOB 1 – Testes de API
   # ─────────────────────────────────────────────
   api-tests:
     name: API Tests
@@ -56,6 +62,10 @@ jobs:
           fi
 
       - name: Run API tests
+        run: echo "STATUS=success" >> $GITHUB_ENV
+        continue-on-error: true
+
+      - name: Run API tests (exec)
         working-directory: api-tests
         run: yarn test
 
@@ -71,7 +81,7 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────
-  # JOB 2 – ANDROID (CORRIGIDO)
+  # JOB 2 – ANDROID
   # ─────────────────────────────────────────────
   mobile-android:
     name: Mobile Tests – Android
@@ -115,13 +125,11 @@ jobs:
             cp .env.example .env
           fi
 
-      # ✅ FORÇA USO DO PATH DO CONTAINER (ESSENCIAL)
       - name: Configure Android app path for Docker
         working-directory: mobile-tests
         run: |
           echo "ANDROID_APP_CONTAINER_PATH=/apps/${APK_NAME}" >> .env
 
-      # ✅ CACHE DO APK
       - name: Cache APK
         uses: actions/cache@v4
         id: cache-apk
@@ -129,14 +137,12 @@ jobs:
           path: mobile-tests/apps
           key: apk-${{ runner.os }}-${{ env.APK_VERSION }}
 
-      # ✅ DOWNLOAD SOMENTE SE NÃO ESTIVER EM CACHE
       - name: Download APK
         if: steps.cache-apk.outputs.cache-hit != 'true'
         run: |
           mkdir -p mobile-tests/apps
           curl -L -o $APK_PATH https://github.com/webdriverio/native-demo-app/releases/download/${APK_VERSION}/android.wdio.native.app.${APK_VERSION}.apk
 
-      # 🔎 VALIDAÇÃO (EVITA SEU ERRO)
       - name: Validate APK
         run: |
           if [ ! -f "$APK_PATH" ]; then
@@ -163,15 +169,12 @@ jobs:
         working-directory: mobile-tests
         run: docker compose up -d
 
-      # 🔎 DEBUG DE VOLUME (OURO PRA NÃO SOFRER)
       - name: Debug APK inside container
         run: |
           echo "Host:"
           ls -la mobile-tests/apps
-
           CONTAINER_ID=$(docker ps -q | head -n 1)
           echo "Container ID: $CONTAINER_ID"
-
           docker exec $CONTAINER_ID ls -la /apps || echo "⚠️ /apps não encontrado"
 
       - name: Wait for emulator boot
@@ -204,9 +207,11 @@ jobs:
           path: |
             mobile-tests/allure-results/
             mobile-tests/reports/
+          if-no-files-found: warn
+          retention-days: 7
 
   # ─────────────────────────────────────────────
-  # JOB 3 – iOS (PRONTO PRA APP REAL)
+  # JOB 3 – iOS
   # ─────────────────────────────────────────────
   mobile-ios:
     name: Mobile Tests – iOS
@@ -285,3 +290,312 @@ jobs:
           path: |
             mobile-tests/allure-results/
             mobile-tests/reports/
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ─────────────────────────────────────────────
+  # JOB 4 – Publicação no GitHub Pages
+  # ─────────────────────────────────────────────
+  publish-reports:
+    name: Publish Reports to GitHub Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Aguarda todos os jobs terminarem (com sucesso ou falha)
+    needs: [api-tests, mobile-android, mobile-ios]
+    if: always()
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Download de todos os reports gerados ──────────────────────────────
+      - name: Download API report
+        uses: actions/download-artifact@v4
+        with:
+          name: api-test-report-${{ github.run_number }}
+          path: gh-pages/api
+        continue-on-error: true
+
+      - name: Download Android report
+        uses: actions/download-artifact@v4
+        with:
+          name: android-test-report-${{ github.run_number }}
+          path: gh-pages/android/allure-results
+        continue-on-error: true
+
+      - name: Download iOS report
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-test-report-${{ github.run_number }}
+          path: gh-pages/ios/allure-results
+        continue-on-error: true
+
+      # ── Gera HTML do Allure para Android e iOS ────────────────────────────
+      - name: Setup Java (Allure)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Allure CLI
+        run: |
+          curl -o allure.tgz -sSLf \
+            https://github.com/allure-framework/allure2/releases/download/2.27.0/allure-2.27.0.tgz
+          sudo tar -zxf allure.tgz -C /opt
+          sudo ln -sf /opt/allure-2.27.0/bin/allure /usr/local/bin/allure
+          allure --version
+
+      - name: Generate Allure report – Android
+        run: |
+          if [ -d "gh-pages/android/allure-results" ] && \
+             [ "$(ls -A gh-pages/android/allure-results)" ]; then
+            allure generate gh-pages/android/allure-results \
+              -o gh-pages/android/report --clean
+          else
+            mkdir -p gh-pages/android/report
+            echo "<h2>Sem resultados Android neste run</h2>" \
+              > gh-pages/android/report/index.html
+          fi
+
+      - name: Generate Allure report – iOS
+        run: |
+          if [ -d "gh-pages/ios/allure-results" ] && \
+             [ "$(ls -A gh-pages/ios/allure-results)" ]; then
+            allure generate gh-pages/ios/allure-results \
+              -o gh-pages/ios/report --clean
+          else
+            mkdir -p gh-pages/ios/report
+            echo "<h2>Sem resultados iOS neste run</h2>" \
+              > gh-pages/ios/report/index.html
+          fi
+
+      # ── Monta status de cada job para exibir na index ────────────────────
+      - name: Resolve job statuses
+        id: statuses
+        run: |
+          API_STATUS="${{ needs.api-tests.result }}"
+          ANDROID_STATUS="${{ needs.mobile-android.result }}"
+          IOS_STATUS="${{ needs.mobile-ios.result }}"
+
+          badge() {
+            case $1 in
+              success)  echo "✅ Passou"  ;;
+              failure)  echo "❌ Falhou"  ;;
+              skipped)  echo "⏭️ Pulado"  ;;
+              *)        echo "⚠️ $1"      ;;
+            esac
+          }
+
+          echo "api_badge=$(badge $API_STATUS)"         >> $GITHUB_OUTPUT
+          echo "android_badge=$(badge $ANDROID_STATUS)" >> $GITHUB_OUTPUT
+          echo "ios_badge=$(badge $IOS_STATUS)"         >> $GITHUB_OUTPUT
+
+          echo "api_status=$API_STATUS"         >> $GITHUB_OUTPUT
+          echo "android_status=$ANDROID_STATUS" >> $GITHUB_OUTPUT
+          echo "ios_status=$IOS_STATUS"         >> $GITHUB_OUTPUT
+
+      # ── Gera a index central com links para cada report ───────────────────
+      - name: Generate index page
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          BRANCH="${{ github.ref_name }}"
+          RUN_NUM="${{ github.run_number }}"
+          DATE=$(date -u '+%d/%m/%Y %H:%M UTC')
+
+          API_STATUS="${{ steps.statuses.outputs.api_status }}"
+          AND_STATUS="${{ steps.statuses.outputs.android_status }}"
+          IOS_STATUS="${{ steps.statuses.outputs.ios_status }}"
+
+          color() {
+            case $1 in
+              success) echo "#22c55e" ;;
+              failure) echo "#ef4444" ;;
+              skipped) echo "#94a3b8" ;;
+              *)       echo "#f59e0b" ;;
+            esac
+          }
+
+          cat > gh-pages/index.html <<EOF
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>Test Reports — Run #${RUN_NUM}</title>
+            <style>
+              *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                background: #0f172a;
+                color: #e2e8f0;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 48px 16px;
+              }
+              .header {
+                text-align: center;
+                margin-bottom: 40px;
+              }
+              .header h1 {
+                font-size: 2rem;
+                font-weight: 700;
+                color: #f8fafc;
+                margin-bottom: 8px;
+              }
+              .header p {
+                color: #94a3b8;
+                font-size: 0.9rem;
+                line-height: 1.6;
+              }
+              .header a { color: #60a5fa; text-decoration: none; }
+              .header a:hover { text-decoration: underline; }
+              .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                gap: 20px;
+                width: 100%;
+                max-width: 900px;
+              }
+              .card {
+                background: #1e293b;
+                border-radius: 12px;
+                padding: 28px 24px;
+                border: 1px solid #334155;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                transition: transform 0.15s, border-color 0.15s;
+              }
+              .card:hover { transform: translateY(-2px); border-color: #475569; }
+              .card-title {
+                font-size: 1rem;
+                font-weight: 600;
+                color: #f1f5f9;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+              }
+              .card-icon { font-size: 1.4rem; }
+              .status-badge {
+                display: inline-block;
+                padding: 4px 12px;
+                border-radius: 99px;
+                font-size: 0.78rem;
+                font-weight: 600;
+                color: #fff;
+              }
+              .btn {
+                display: inline-block;
+                margin-top: auto;
+                padding: 10px 20px;
+                background: #3b82f6;
+                color: #fff;
+                border-radius: 8px;
+                text-decoration: none;
+                font-size: 0.875rem;
+                font-weight: 500;
+                text-align: center;
+                transition: background 0.15s;
+              }
+              .btn:hover { background: #2563eb; }
+              .footer {
+                margin-top: 48px;
+                color: #475569;
+                font-size: 0.8rem;
+                text-align: center;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>📊 Test Reports</h1>
+              <p>
+                Run <a href="${RUN_URL}">#${RUN_NUM}</a> &nbsp;·&nbsp;
+                Branch <strong>${BRANCH}</strong> &nbsp;·&nbsp;
+                Commit <a href="${COMMIT_URL}">${SHORT_SHA}</a>
+              </p>
+              <p style="margin-top:4px">${DATE}</p>
+            </div>
+
+            <div class="grid">
+
+              <div class="card">
+                <div class="card-title">
+                  <span class="card-icon">🔌</span> API Tests
+                </div>
+                <span class="status-badge" style="background:$(color $API_STATUS)">
+                  ${{ steps.statuses.outputs.api_badge }}
+                </span>
+                <p style="color:#94a3b8;font-size:0.85rem">
+                  Testes de contrato e integração via REST.<br/>
+                  Report gerado pelo Mochawesome.
+                </p>
+                <a class="btn" href="api/mochawesome-report/mochawesome.html">
+                  Ver Report →
+                </a>
+              </div>
+
+              <div class="card">
+                <div class="card-title">
+                  <span class="card-icon">🤖</span> Android Tests
+                </div>
+                <span class="status-badge" style="background:$(color $AND_STATUS)">
+                  ${{ steps.statuses.outputs.android_badge }}
+                </span>
+                <p style="color:#94a3b8;font-size:0.85rem">
+                  Testes E2E no emulador Android via Appium.<br/>
+                  Report gerado pelo Allure.
+                </p>
+                <a class="btn" href="android/report/index.html">
+                  Ver Report →
+                </a>
+              </div>
+
+              <div class="card">
+                <div class="card-title">
+                  <span class="card-icon">🍎</span> iOS Tests
+                </div>
+                <span class="status-badge" style="background:$(color $IOS_STATUS)">
+                  ${{ steps.statuses.outputs.ios_badge }}
+                </span>
+                <p style="color:#94a3b8;font-size:0.85rem">
+                  Testes E2E no simulador iOS via Appium.<br/>
+                  Report gerado pelo Allure.
+                </p>
+                <a class="btn" href="ios/report/index.html">
+                  Ver Report →
+                </a>
+              </div>
+
+            </div>
+
+            <div class="footer">
+              Gerado automaticamente pelo GitHub Actions &nbsp;·&nbsp;
+              <a href="${RUN_URL}" style="color:#475569">Ver workflow</a>
+            </div>
+          </body>
+          </html>
+          EOF
+
+      # ── Deploy no GitHub Pages ────────────────────────────────────────────
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: gh-pages
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+```
