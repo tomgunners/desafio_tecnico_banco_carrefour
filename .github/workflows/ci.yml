@@ -77,7 +77,7 @@ jobs:
     timeout-minutes: 60
 
     env:
-      APK_VERSION: v1.0.8
+      APK_VERSION: v2.0.0
       APK_NAME: wdio-native-demo-app.apk
       APK_PATH: mobile-tests/apps/wdio-native-demo-app.apk
 
