@@ -10,11 +10,6 @@ on:
 env:
   NODE_VERSION: '22'
 
-# ✅ Permissões necessárias para o deploy no GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -300,17 +295,26 @@ jobs:
     name: Publish Reports to GitHub Pages
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Aguarda todos os jobs terminarem (com sucesso ou falha)
     needs: [api-tests, mobile-android, mobile-ios]
-    if: always()
+    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
 
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+      deployments: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      # ── Limpa deployments anteriores para não acumular no histórico ───────
+      - name: Limpar deployments antigos
+        uses: strumwolf/delete-deployment-environment@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: github-pages
+          onlyRemoveDeployments: true
 
       # ── Download de todos os reports gerados ──────────────────────────────
       - name: Download API report
@@ -355,10 +359,12 @@ jobs:
              [ "$(ls -A gh-pages/android/allure-results)" ]; then
             allure generate gh-pages/android/allure-results \
               -o gh-pages/android/report --clean
+            echo "✅ Allure Android gerado"
           else
             mkdir -p gh-pages/android/report
             echo "<h2>Sem resultados Android neste run</h2>" \
               > gh-pages/android/report/index.html
+            echo "⚠️ Sem resultados Android"
           fi
 
       - name: Generate Allure report – iOS
@@ -367,10 +373,12 @@ jobs:
              [ "$(ls -A gh-pages/ios/allure-results)" ]; then
             allure generate gh-pages/ios/allure-results \
               -o gh-pages/ios/report --clean
+            echo "✅ Allure iOS gerado"
           else
             mkdir -p gh-pages/ios/report
             echo "<h2>Sem resultados iOS neste run</h2>" \
               > gh-pages/ios/report/index.html
+            echo "⚠️ Sem resultados iOS"
           fi
 
       # ── Monta status de cada job para exibir na index ────────────────────
@@ -586,15 +594,15 @@ jobs:
           </html>
           EOF
 
-      # ── Deploy no GitHub Pages ────────────────────────────────────────────
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v4
+      # ── Debug: lista arquivos antes do deploy ────────────────────────────
+      - name: Listar arquivos do site
+        run: find gh-pages -type f | head -50 || echo "Nenhum arquivo encontrado"
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      # ── Deploy no GitHub Pages via peaceiris (push na branch gh-pages) ───
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: gh-pages
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: gh-pages
+          keep_files: false
+          commit_message: "ci: deploy reports — run #${{ github.run_number }} (${{ github.sha }})"
