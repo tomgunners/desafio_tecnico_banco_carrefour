@@ -63,7 +63,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: api-test-report-${{ github.run_number }}
+          name: api-allure-results-${{ github.run_number }}
           path: api-tests/allure-results/
           if-no-files-found: warn
           retention-days: 7
@@ -191,7 +191,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-test-report-${{ github.run_number }}
+          name: android-allure-results-${{ github.run_number }}
+          # O upload pega os arquivos direto da pasta allure-results/
+          # Ao baixar com download-artifact, os arquivos ficam na raiz
+          # do path de destino — sem subpasta extra.
           path: mobile-tests/allure-results/
           if-no-files-found: warn
           retention-days: 7
@@ -216,8 +219,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Faz checkout da branch gh-pages para recuperar o histórico ────────
-      # Sem isso os gráficos de trend do Allure ficam vazios a cada run
+      # Faz checkout da branch gh-pages para recuperar o histórico anterior.
+      # continue-on-error: true protege o primeiro run (branch ainda não existe).
       - name: Checkout gh-pages (histórico anterior)
         uses: actions/checkout@v4
         with:
@@ -225,7 +228,6 @@ jobs:
           path: gh-pages-prev
         continue-on-error: true
 
-      # ── Limpa deployments anteriores do histórico do GitHub ───────────────
       - name: Limpar deployments antigos
         uses: strumwolf/delete-deployment-environment@v3
         with:
@@ -233,20 +235,31 @@ jobs:
           environment: github-pages
           onlyRemoveDeployments: true
 
-      # ── Download dos artifacts gerados pelos jobs ─────────────────────────
+      # ── Download dos artifacts ─────────────────────────────────────────────
+      # O download-artifact@v4 deposita os arquivos diretamente no path
+      # informado, SEM criar subpasta extra com o nome do artifact.
+      # Resultado: allure-raw/api/*.json e allure-raw/android/*.json
       - name: Download Allure results – API
         uses: actions/download-artifact@v4
         with:
-          name: api-test-report-${{ github.run_number }}
+          name: api-allure-results-${{ github.run_number }}
           path: allure-raw/api
         continue-on-error: true
 
       - name: Download Allure results – Android
         uses: actions/download-artifact@v4
         with:
-          name: android-test-report-${{ github.run_number }}
+          name: android-allure-results-${{ github.run_number }}
           path: allure-raw/android
         continue-on-error: true
+
+      # ── Diagnóstico: exibe o que foi baixado ──────────────────────────────
+      - name: Listar arquivos baixados
+        run: |
+          echo "=== allure-raw/api ==="
+          find allure-raw/api -type f 2>/dev/null | head -20 || echo "(vazio)"
+          echo "=== allure-raw/android ==="
+          find allure-raw/android -type f 2>/dev/null | head -20 || echo "(vazio)"
 
       # ── Setup Java + Allure CLI ───────────────────────────────────────────
       - name: Setup Java (Allure)
@@ -263,7 +276,10 @@ jobs:
           sudo ln -sf /opt/allure-2.27.0/bin/allure /usr/local/bin/allure
           allure --version
 
-      # ── Injeta histórico anterior antes de gerar (ativa gráfico de trend) ─
+      # ── Restaura histórico de trend – API ─────────────────────────────────
+      # allure-raw/api/ já contém os .json de resultado.
+      # Copia gh-pages-prev/api/report/history → allure-raw/api/history/
+      # para que o allure generate inclua o histórico acumulado.
       - name: Restore Allure history – API
         run: |
           RESULTS_DIR="allure-raw/api"
@@ -271,20 +287,24 @@ jobs:
           if [ -d "$HISTORY_SRC" ]; then
             mkdir -p "$RESULTS_DIR/history"
             cp -r "$HISTORY_SRC/." "$RESULTS_DIR/history/"
-            echo "✅ Histórico API restaurado"
+            echo "✅ Histórico API restaurado ($(ls $RESULTS_DIR/history | wc -l) arquivos)"
           else
             echo "ℹ️ Nenhum histórico API anterior — primeiro run"
           fi
 
+      # ── Restaura histórico de trend – Android ─────────────────────────────
+      # IMPORTANTE: allure-raw/android/ já contém os .json de resultado
+      # (download-artifact@v4 NÃO cria subpasta extra).
+      # O erro anterior apontava para allure-raw/android/allure-results/
+      # que não existia, fazendo o allure gerar relatório vazio (só trend).
       - name: Restore Allure history – Android
         run: |
-          # O download-artifact cria uma subpasta extra com o nome original
-          RESULTS_DIR="allure-raw/android/allure-results"
+          RESULTS_DIR="allure-raw/android"
           HISTORY_SRC="gh-pages-prev/android/report/history"
           if [ -d "$HISTORY_SRC" ]; then
             mkdir -p "$RESULTS_DIR/history"
             cp -r "$HISTORY_SRC/." "$RESULTS_DIR/history/"
-            echo "✅ Histórico Android restaurado"
+            echo "✅ Histórico Android restaurado ($(ls $RESULTS_DIR/history | wc -l) arquivos)"
           else
             echo "ℹ️ Nenhum histórico Android anterior — primeiro run"
           fi
@@ -304,7 +324,7 @@ jobs:
 
       - name: Generate Allure report – Android
         run: |
-          RESULTS_DIR="allure-raw/android/allure-results"
+          RESULTS_DIR="allure-raw/android"
           if [ -d "$RESULTS_DIR" ] && [ "$(ls -A $RESULTS_DIR)" ]; then
             allure generate "$RESULTS_DIR" -o gh-pages/android/report --clean
             echo "✅ Allure Android gerado"
@@ -466,7 +486,6 @@ jobs:
       - name: Listar arquivos do site
         run: find gh-pages -type f | head -50 || echo "Nenhum arquivo encontrado"
 
-      # ── Deploy no GitHub Pages (keep_files preserva histórico na branch) ──
       - name: Publish to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
