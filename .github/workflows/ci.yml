@@ -355,9 +355,9 @@ jobs:
 
       - name: Generate Allure report – Android
         run: |
-          if [ -d "gh-pages/android/allure-results" ] && \
-             [ "$(ls -A gh-pages/android/allure-results)" ]; then
-            allure generate gh-pages/android/allure-results \
+          if [ -d "gh-pages/android/allure-results/allure-results" ] && \
+             [ "$(ls -A gh-pages/android/allure-results/allure-results)" ]; then
+            allure generate gh-pages/android/allure-results/allure-results \
               -o gh-pages/android/report --clean
             echo "✅ Allure Android gerado"
           else
@@ -369,9 +369,9 @@ jobs:
 
       - name: Generate Allure report – iOS
         run: |
-          if [ -d "gh-pages/ios/allure-results" ] && \
-             [ "$(ls -A gh-pages/ios/allure-results)" ]; then
-            allure generate gh-pages/ios/allure-results \
+          if [ -d "gh-pages/ios/allure-results/allure-results" ] && \
+             [ "$(ls -A gh-pages/ios/allure-results/allure-results)" ]; then
+            allure generate gh-pages/ios/allure-results/allure-results \
               -o gh-pages/ios/report --clean
             echo "✅ Allure iOS gerado"
           else
@@ -547,7 +547,7 @@ jobs:
                   Testes de contrato e integração via REST.<br/>
                   Report gerado pelo Mochawesome.
                 </p>
-                <a class="btn" href="api/mochawesome-report/mochawesome.html">
+                <a class="btn" href="api/reports/api-report.html">
                   Ver Report →
                 </a>
               </div>
