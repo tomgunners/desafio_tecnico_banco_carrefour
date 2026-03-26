@@ -20,7 +20,7 @@ export const config: Options.Testrunner = {
   capabilities: [{
     platformName: 'Android',
     'appium:automationName': 'UiAutomator2',
-    'appium:platformVersion': process.env.ANDROID_PLATFORM_VERSION ?? '15',
+    'appium:platformVersion': process.env.ANDROID_PLATFORM_VERSION ?? '14',
     'appium:deviceName':      process.env.ANDROID_DEVICE_NAME ?? 'emulator-5554',
     'appium:app':             APP_PATH,
     'appium:noReset':             false,
