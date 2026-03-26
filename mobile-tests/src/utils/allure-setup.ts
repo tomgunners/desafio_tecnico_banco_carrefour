@@ -31,7 +31,7 @@ function ensureDir(dir: string): void {
 function createEnvironmentFile(): void {
   const environment: Record<string, string> = {
     Platform: 'Android',
-    'Platform.Version': process.env.ANDROID_PLATFORM_VERSION || '15',
+    'Platform.Version': process.env.ANDROID_PLATFORM_VERSION || '14',
     'Device.Name': process.env.ANDROID_DEVICE_NAME || 'emulator-5554',
     'App.Name': process.env.ANDROID_APP_NAME || 'wdio-native-demo-app.apk',
     'Automation.Engine': 'UiAutomator2',
