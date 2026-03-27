@@ -226,19 +226,17 @@ O pipeline está consolidado em um único arquivo `.github/workflows/ci.yml` com
 
 **`api-tests`** — Trigger: push/PR em `main` ou `develop`
 1. Instalar dependências (cache por `yarn.lock`)
-2. Copiar `.env.example` → `.env` quando disponível
-3. Executar todos os testes de API
-4. Publicar resultados Allure como artifact (retidos 7 dias)
+2. Executar todos os testes de API
+3. Publicar resultados Allure como artifact (retidos 7 dias)
 
 **`mobile-android`** — Trigger: push/PR em `main` ou `develop`
 1. Instalar dependências (cache por `yarn.lock`)
-2. Copiar `.env.example` → `.env` quando disponível
-3. Baixar APK (cache por versão)
-4. Habilitar KVM + instalar `adb`
-5. Subir `docker-compose` com emulador Android
-6. Aguardar boot do emulador e disponibilidade do Appium
-7. Executar testes Android
-8. Publicar resultados Allure como artifact (retidos 7 dias)
+2. Baixar APK (cache por versão)
+3. Habilitar KVM + instalar `adb`
+4. Subir `docker-compose` com emulador Android
+5. Aguardar boot do emulador e disponibilidade do Appium
+6. Executar testes Android
+7. Publicar resultados Allure como artifact (retidos 7 dias)
 
 **`publish-reports`** — Executa após ambos os jobs (mesmo em falha)
 1. Restaurar histórico Allure de execuções anteriores (branch `gh-pages`)
