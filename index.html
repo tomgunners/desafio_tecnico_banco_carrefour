@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test Reports — Run #1</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px;
+    }
+    .header { text-align: center; margin-bottom: 40px; }
+    .header h1 { font-size: 2rem; font-weight: 700; color: #f8fafc; margin-bottom: 8px; }
+    .header p { color: #94a3b8; font-size: 0.9rem; line-height: 1.6; }
+    .header a { color: #60a5fa; text-decoration: none; }
+    .header a:hover { text-decoration: underline; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      width: 100%;
+      max-width: 700px;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 28px 24px;
+      border: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .card:hover { transform: translateY(-2px); border-color: #475569; }
+    .card-title { font-size: 1rem; font-weight: 600; color: #f1f5f9; display: flex; align-items: center; gap: 10px; }
+    .card-icon { font-size: 1.4rem; }
+    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-size: 0.78rem; font-weight: 600; color: #fff; }
+    .btn { display: inline-block; margin-top: auto; padding: 10px 20px; background: #3b82f6; color: #fff; border-radius: 8px; text-decoration: none; font-size: 0.875rem; font-weight: 500; text-align: center; transition: background 0.15s; }
+    .btn:hover { background: #2563eb; }
+    .footer { margin-top: 48px; color: #475569; font-size: 0.8rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 Test Reports</h1>
+    <p>
+      Run <a href="https://github.com/tomgunners/desafio_tecnico_banco_carrefour/actions/runs/23647832972">#1</a> &nbsp;·&nbsp;
+      Branch <strong>main</strong> &nbsp;·&nbsp;
+      Commit <a href="https://github.com/tomgunners/desafio_tecnico_banco_carrefour/commit/36db3bc4c7c3380119496baf6e1217c2d0c106ca">36db3bc</a>
+    </p>
+    <p style="margin-top:4px">27/03/2026 13:20 UTC</p>
+  </div>
+
+  <div class="grid">
+
+    <div class="card">
+      <div class="card-title">
+        <span class="card-icon">🔌</span> API Tests
+      </div>
+      <span class="status-badge" style="background:#22c55e">
+        Passou
+      </span>
+      <p style="color:#94a3b8;font-size:0.85rem">
+        Testes de contrato e integração via REST.<br/>
+        Report gerado pelo Allure.
+      </p>
+      <a class="btn" href="api/report/index.html">
+        Ver Report →
+      </a>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span class="card-icon">🤖</span> Android Tests
+      </div>
+      <span class="status-badge" style="background:#22c55e">
+        Passou
+      </span>
+      <p style="color:#94a3b8;font-size:0.85rem">
+        Testes E2E no emulador Android via Appium.<br/>
+        Report gerado pelo Allure.
+      </p>
+      <a class="btn" href="android/report/index.html">
+        Ver Report →
+      </a>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    Gerado automaticamente pelo GitHub Actions &nbsp;·&nbsp;
+    <a href="https://github.com/tomgunners/desafio_tecnico_banco_carrefour/actions/runs/23647832972" style="color:#475569">Ver workflow</a>
+  </div>
+</body>
+</html>

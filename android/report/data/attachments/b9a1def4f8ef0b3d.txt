@@ -1,0 +1,4 @@
+{
+  "using": "id",
+  "value": "com.wdiodemoapp:id/parentPanel"
+}

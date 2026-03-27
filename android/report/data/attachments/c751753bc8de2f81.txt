@@ -1,0 +1,4 @@
+{
+  "using": "xpath",
+  "value": "//android.widget.EditText[contains(@resource-id,\"text_input\")]"
+}

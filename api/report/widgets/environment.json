@@ -1,0 +1,1 @@
+[{"values":["https://dummyjson.com"],"name":"API.BaseUrl"},{"values":["CI/CD"],"name":"Execution.Type"},{"values":["QA"],"name":"Environment"},{"values":["v22.22.1"],"name":"Node.Version"},{"values":["Linux 6.17.0-1008-azure"],"name":"OS"},{"values":["runnervmrg6be"],"name":"Machine"}]
