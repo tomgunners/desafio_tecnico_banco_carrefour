@@ -1,0 +1,32 @@
+# ─── Dependências ─────────────────────────────────────────────────────────────
+node_modules/
+api-tests/node_modules/
+mobile-tests/node_modules/
+
+# ─── Relatórios e resultados ──────────────────────────────────────────────────
+api-tests/allure-results/
+api-tests/allure-report/
+api-tests/reports/
+mobile-tests/reports/
+mobile-tests/allure-results/
+mobile-tests/allure-report/
+
+# ─── IDEs ─────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Mobile Apps (binários grandes) ──────────────────────────────────────────
+mobile-tests/apps/*.apk
+
+# ─── Limpeza do Projeto  ──────────────────────────────────────────
+clean.ps1

@@ -1,0 +1,477 @@
+name: CI – API & Mobile Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '22'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────
+  # JOB 1 – Testes de API
+  # ─────────────────────────────────────────────
+  api-tests:
+    name: API Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: cache-node-modules-api
+        with:
+          path: |
+            node_modules
+            api-tests/node_modules
+          key: api-node-modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            api-node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cache-node-modules-api.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Copy environment file
+        working-directory: api-tests
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          fi
+
+      - name: Run API tests
+        working-directory: api-tests
+        run: yarn test
+
+      - name: Upload Allure results – API
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-allure-results-${{ github.run_number }}
+          path: api-tests/allure-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ─────────────────────────────────────────────
+  # JOB 2 – ANDROID
+  # ─────────────────────────────────────────────
+  mobile-android:
+    name: Mobile Tests – Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    env:
+      APK_VERSION: v2.0.0
+      APK_NAME: wdio-native-demo-app.apk
+      APK_PATH: mobile-tests/apps/wdio-native-demo-app.apk
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'yarn'
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        id: cache-node-modules-android
+        with:
+          path: |
+            node_modules
+            mobile-tests/node_modules
+          key: mobile-node-modules-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            mobile-node-modules-${{ runner.os }}-
+
+      - name: Install dependencies
+        if: steps.cache-node-modules-android.outputs.cache-hit != 'true'
+        run: yarn install --frozen-lockfile
+
+      - name: Copy environment file
+        working-directory: mobile-tests
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          fi
+
+      - name: Configure Android app path for Docker
+        working-directory: mobile-tests
+        run: |
+          echo "ANDROID_APP_CONTAINER_PATH=/apps/${APK_NAME}" >> .env
+
+      - name: Cache APK
+        uses: actions/cache@v4
+        id: cache-apk
+        with:
+          path: mobile-tests/apps
+          key: apk-${{ runner.os }}-${{ env.APK_VERSION }}
+
+      - name: Download APK
+        if: steps.cache-apk.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p mobile-tests/apps
+          curl -L -o $APK_PATH https://github.com/webdriverio/native-demo-app/releases/download/${APK_VERSION}/android.wdio.native.app.${APK_VERSION}.apk
+
+      - name: Validate APK
+        run: |
+          if [ ! -f "$APK_PATH" ]; then
+            echo "APK não encontrado em $APK_PATH"
+            exit 1
+          fi
+          echo "APK encontrado:"
+          ls -la mobile-tests/apps
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install adb
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y android-tools-adb
+          adb version
+
+      - name: Start Docker Compose
+        working-directory: mobile-tests
+        run: docker compose up -d
+
+      - name: Debug APK inside container
+        run: |
+          echo "Host:"
+          ls -la mobile-tests/apps
+          CONTAINER_ID=$(docker ps -q | head -n 1)
+          echo "Container ID: $CONTAINER_ID"
+          docker exec $CONTAINER_ID ls -la /apps || echo "/apps não encontrado"
+
+      - name: Wait for emulator boot
+        run: |
+          adb wait-for-device
+          until adb shell getprop sys.boot_completed | grep -m 1 '1'; do
+            echo "aguardando boot..."
+            sleep 5
+          done
+          adb shell input keyevent 82
+
+      - name: Wait for Appium
+        working-directory: mobile-tests
+        run: node scripts/wait-for-appium.js
+
+      - name: Run Android tests
+        working-directory: mobile-tests
+        run: yarn test:android
+
+      - name: Stop Docker Compose
+        if: always()
+        working-directory: mobile-tests
+        run: docker compose down
+
+      - name: Upload Allure results – Android
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-allure-results-${{ github.run_number }}
+          path: mobile-tests/allure-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ─────────────────────────────────────────────
+  # JOB 3 – Publicação no GitHub Pages
+  # ─────────────────────────────────────────────
+  publish-reports:
+    name: Publish Reports to GitHub Pages
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [api-tests, mobile-android]
+    if: always() && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+      deployments: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout gh-pages (histórico anterior)
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-prev
+        continue-on-error: true
+
+      - name: Limpar deployments antigos
+        uses: strumwolf/delete-deployment-environment@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: github-pages
+          onlyRemoveDeployments: true
+
+      - name: Download Allure results – API
+        uses: actions/download-artifact@v4
+        with:
+          name: api-allure-results-${{ github.run_number }}
+          path: allure-raw/api
+        continue-on-error: true
+
+      - name: Download Allure results – Android
+        uses: actions/download-artifact@v4
+        with:
+          name: android-allure-results-${{ github.run_number }}
+          path: allure-raw/android
+        continue-on-error: true
+
+      # ── Diagnóstico: exibe o que foi baixado ──────────────────────────────
+      - name: Listar arquivos baixados
+        run: |
+          echo "=== allure-raw/api ==="
+          find allure-raw/api -type f 2>/dev/null | head -20 || echo "(vazio)"
+          echo "=== allure-raw/android ==="
+          find allure-raw/android -type f 2>/dev/null | head -20 || echo "(vazio)"
+
+      # ── Setup Java + Allure CLI ───────────────────────────────────────────
+      - name: Setup Java (Allure)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Allure CLI
+        run: |
+          curl -o allure.tgz -sSLf \
+            https://github.com/allure-framework/allure2/releases/download/2.27.0/allure-2.27.0.tgz
+          sudo tar -zxf allure.tgz -C /opt
+          sudo ln -sf /opt/allure-2.27.0/bin/allure /usr/local/bin/allure
+          allure --version
+
+      - name: Restore Allure history – API
+        run: |
+          RESULTS_DIR="allure-raw/api"
+          HISTORY_SRC="gh-pages-prev/api/report/history"
+          if [ -d "$HISTORY_SRC" ]; then
+            mkdir -p "$RESULTS_DIR/history"
+            cp -r "$HISTORY_SRC/." "$RESULTS_DIR/history/"
+            echo "Histórico API restaurado ($(ls $RESULTS_DIR/history | wc -l) arquivos)"
+          else
+            echo "Nenhum histórico API anterior — primeiro run"
+          fi
+
+      - name: Restore Allure history – Android
+        run: |
+          RESULTS_DIR="allure-raw/android"
+          HISTORY_SRC="gh-pages-prev/android/report/history"
+          if [ -d "$HISTORY_SRC" ]; then
+            mkdir -p "$RESULTS_DIR/history"
+            cp -r "$HISTORY_SRC/." "$RESULTS_DIR/history/"
+            echo "Histórico Android restaurado ($(ls $RESULTS_DIR/history | wc -l) arquivos)"
+          else
+            echo "Nenhum histórico Android anterior — primeiro run"
+          fi
+
+      # ── Gera relatórios Allure ────────────────────────────────────────────
+      - name: Generate Allure report – API
+        run: |
+          RESULTS_DIR="allure-raw/api"
+          if [ -d "$RESULTS_DIR" ] && [ "$(ls -A $RESULTS_DIR)" ]; then
+            allure generate "$RESULTS_DIR" -o gh-pages/api/report --clean
+            echo "Allure API gerado"
+          else
+            mkdir -p gh-pages/api/report
+            echo "<h2>Sem resultados API neste run</h2>" > gh-pages/api/report/index.html
+            echo "Sem resultados API"
+          fi
+
+      - name: Generate Allure report – Android
+        run: |
+          RESULTS_DIR="allure-raw/android"
+          if [ -d "$RESULTS_DIR" ] && [ "$(ls -A $RESULTS_DIR)" ]; then
+            allure generate "$RESULTS_DIR" -o gh-pages/android/report --clean
+            echo "Allure Android gerado"
+          else
+            mkdir -p gh-pages/android/report
+            echo "<h2>Sem resultados Android neste run</h2>" > gh-pages/android/report/index.html
+            echo "Sem resultados Android"
+          fi
+
+      # ── Resolve status de cada job ────────────────────────────────────────
+      - name: Resolve job statuses
+        id: statuses
+        run: |
+          API_STATUS="${{ needs.api-tests.result }}"
+          ANDROID_STATUS="${{ needs.mobile-android.result }}"
+
+          badge() {
+            case $1 in
+              success)  echo "Passou"  ;;
+              failure)  echo "Falhou"  ;;
+              skipped)  echo "Pulado"  ;;
+              *)        echo "⚠️ $1"      ;;
+            esac
+          }
+
+          echo "api_badge=$(badge $API_STATUS)"         >> $GITHUB_OUTPUT
+          echo "android_badge=$(badge $ANDROID_STATUS)" >> $GITHUB_OUTPUT
+          echo "api_status=$API_STATUS"                 >> $GITHUB_OUTPUT
+          echo "android_status=$ANDROID_STATUS"         >> $GITHUB_OUTPUT
+
+      # ── Gera index central com links para os reports ──────────────────────
+      - name: Generate index page
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          COMMIT_URL="https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+          SHORT_SHA="${{ github.sha }}"
+          SHORT_SHA="${SHORT_SHA:0:7}"
+          BRANCH="${{ github.ref_name }}"
+          RUN_NUM="${{ github.run_number }}"
+          DATE=$(date -u '+%d/%m/%Y %H:%M UTC')
+
+          API_STATUS="${{ steps.statuses.outputs.api_status }}"
+          AND_STATUS="${{ steps.statuses.outputs.android_status }}"
+
+          color() {
+            case $1 in
+              success) echo "#22c55e" ;;
+              failure) echo "#ef4444" ;;
+              skipped) echo "#94a3b8" ;;
+              *)       echo "#f59e0b" ;;
+            esac
+          }
+
+          cat > gh-pages/index.html <<EOF
+          <!DOCTYPE html>
+          <html lang="pt-BR">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>Test Reports — Run #${RUN_NUM}</title>
+            <style>
+              *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                background: #0f172a;
+                color: #e2e8f0;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 48px 16px;
+              }
+              .header { text-align: center; margin-bottom: 40px; }
+              .header h1 { font-size: 2rem; font-weight: 700; color: #f8fafc; margin-bottom: 8px; }
+              .header p { color: #94a3b8; font-size: 0.9rem; line-height: 1.6; }
+              .header a { color: #60a5fa; text-decoration: none; }
+              .header a:hover { text-decoration: underline; }
+              .grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+                gap: 20px;
+                width: 100%;
+                max-width: 700px;
+              }
+              .card {
+                background: #1e293b;
+                border-radius: 12px;
+                padding: 28px 24px;
+                border: 1px solid #334155;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                transition: transform 0.15s, border-color 0.15s;
+              }
+              .card:hover { transform: translateY(-2px); border-color: #475569; }
+              .card-title { font-size: 1rem; font-weight: 600; color: #f1f5f9; display: flex; align-items: center; gap: 10px; }
+              .card-icon { font-size: 1.4rem; }
+              .status-badge { display: inline-block; padding: 4px 12px; border-radius: 99px; font-size: 0.78rem; font-weight: 600; color: #fff; }
+              .btn { display: inline-block; margin-top: auto; padding: 10px 20px; background: #3b82f6; color: #fff; border-radius: 8px; text-decoration: none; font-size: 0.875rem; font-weight: 500; text-align: center; transition: background 0.15s; }
+              .btn:hover { background: #2563eb; }
+              .footer { margin-top: 48px; color: #475569; font-size: 0.8rem; text-align: center; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>📊 Test Reports</h1>
+              <p>
+                Run <a href="${RUN_URL}">#${RUN_NUM}</a> &nbsp;·&nbsp;
+                Branch <strong>${BRANCH}</strong> &nbsp;·&nbsp;
+                Commit <a href="${COMMIT_URL}">${SHORT_SHA}</a>
+              </p>
+              <p style="margin-top:4px">${DATE}</p>
+            </div>
+
+            <div class="grid">
+
+              <div class="card">
+                <div class="card-title">
+                  <span class="card-icon">🔌</span> API Tests
+                </div>
+                <span class="status-badge" style="background:$(color $API_STATUS)">
+                  ${{ steps.statuses.outputs.api_badge }}
+                </span>
+                <p style="color:#94a3b8;font-size:0.85rem">
+                  Testes de contrato e integração via REST.<br/>
+                  Report gerado pelo Allure.
+                </p>
+                <a class="btn" href="api/report/index.html">
+                  Ver Report →
+                </a>
+              </div>
+
+              <div class="card">
+                <div class="card-title">
+                  <span class="card-icon">🤖</span> Android Tests
+                </div>
+                <span class="status-badge" style="background:$(color $AND_STATUS)">
+                  ${{ steps.statuses.outputs.android_badge }}
+                </span>
+                <p style="color:#94a3b8;font-size:0.85rem">
+                  Testes E2E no emulador Android via Appium.<br/>
+                  Report gerado pelo Allure.
+                </p>
+                <a class="btn" href="android/report/index.html">
+                  Ver Report →
+                </a>
+              </div>
+
+            </div>
+
+            <div class="footer">
+              Gerado automaticamente pelo GitHub Actions &nbsp;·&nbsp;
+              <a href="${RUN_URL}" style="color:#475569">Ver workflow</a>
+            </div>
+          </body>
+          </html>
+          EOF
+
+      - name: Listar arquivos do site
+        run: find gh-pages -type f | head -50 || echo "Nenhum arquivo encontrado"
+
+      - name: Publish to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: gh-pages
+          keep_files: false
+          commit_message: "ci: deploy reports — run #${{ github.run_number }} (${{ github.sha }})"

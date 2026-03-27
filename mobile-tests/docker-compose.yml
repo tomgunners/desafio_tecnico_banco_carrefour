@@ -1,0 +1,79 @@
+# docker-compose.yml — Ambiente local com docker-android
+#
+# Sobe o emulador Android + servidor Appium num único container,
+# espelhando exatamente o ambiente de CI (GitHub Actions).
+#
+# Pré-requisitos (Windows/WSL2):
+#   - Docker Desktop instalado com backend WSL2
+#   - Virtualização aninhada habilitada — crie/edite %USERPROFILE%\.wslconfig no PowerShell:
+#
+#       notepad $env:USERPROFILE\.wslconfig
+#
+#     Adicione o bloco abaixo e salve:
+#
+#       [wsl2]
+#       nestedVirtualization=true
+#
+#     Em seguida reinicie o WSL:
+#       wsl --shutdown
+#
+#   - KVM habilitado no WSL2 — rode UMA VEZ no terminal WSL:
+#
+#       sudo usermod -aG kvm $USER
+#       sudo chmod 666 /dev/kvm
+#
+#     Verifique: ls -l /dev/kvm
+#     Esperado:  crw-rw-rw- root kvm ...
+#
+#   - Se /dev/kvm não existir ou persistir erro de permissão, o emulador
+#     roda em modo software (-no-accel). É mais lento, mas funciona.
+#
+#   - APK em mobile-tests/apps/wdio-native-demo-app.apk
+#
+# Uso:
+#   docker compose up -d          # inicia o container em background
+#   docker compose logs -f        # acompanha logs do emulador/Appium
+#   docker compose down           # encerra e remove o container
+
+services:
+  android:
+    image: budtmo/docker-android:emulator_14.0
+    container_name: mobile-tests-android-1   # nome fixo para o docker exec funcionar
+    privileged: true
+    ports:
+      - "6080:6080"   # VNC Web — acesse http://localhost:6080 para ver a tela do emulador
+      - "4723:4723"   # Appium Server
+      - "5555:5555"   # ADB
+    environment:
+      - EMULATOR_DEVICE=Samsung Galaxy S10
+      - WEB_VNC=true
+      - APPIUM=true
+      # Memória RAM do emulador — mínimo recomendado para Android 14
+      - MEMORY=4096
+      # Tamanho da partição de dados do emulador
+      - DATAPARTITION=4096
+      # -gpu swiftshader_indirect : renderização por software (sem GPU no container)
+      # -no-accel                 : FIX — desativa aceleração KVM dentro do emulador;
+      #                             resolve o crash do processo "device" (exit status 1)
+      #                             em ambientes Windows/WSL2 onde o /dev/kvm existe mas
+      #                             a virtualização aninhada ainda não está totalmente ativa.
+      # -no-audio                 : sem saída de áudio (não existe no container)
+      # -no-boot-anim             : acelera o boot
+      # -no-snapshot              : evita erros de snapshot corrompido
+      - EMULATOR_ARGS=-no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -no-accel
+    volumes:
+      # Monta a pasta de apps local dentro do container.
+      # O wdio.android.conf.ts usa ANDROID_APP_CONTAINER_PATH=/apps/<nome>.apk
+      - ./apps:/apps
+
+    devices:
+      - /dev/kvm:/dev/kvm
+
+    shm_size: "2gb"
+    healthcheck:
+
+      test: ["CMD", "curl", "-sf", "http://localhost:4723/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s

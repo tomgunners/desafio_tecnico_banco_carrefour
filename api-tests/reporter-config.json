@@ -1,0 +1,13 @@
+{
+  "reporterEnabled": "mochawesome, allure-mocha",
+  "mochawesomeReporterOptions": {
+    "reportDir":      "reports",
+    "reportFilename": "api-report",
+    "overwrite":      true,
+    "html":           true,
+    "json":           true
+  },
+  "allureMochaReporterOptions": {
+    "resultsDir": "allure-results"
+  }
+}

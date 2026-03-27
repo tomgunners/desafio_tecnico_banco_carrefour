@@ -1,0 +1,29 @@
+{
+  "name": "test-automation-monorepo",
+  "version": "1.0.0",
+  "description": "Monorepo de automação de testes — Desafio Banco Carrefour",
+  "private": true,
+  "workspaces": [
+    "api-tests",
+    "mobile-tests"
+  ],
+  "scripts": {
+    "test:api": "yarn workspace api-tests test",
+    "test:api:report": "yarn workspace api-tests report:html",
+    "test:api:allure": "yarn workspace api-tests report:allure",
+    "test:mobile": "yarn workspace mobile-tests test:android",
+    "test:mobile:docker": "yarn workspace mobile-tests docker:test",
+    "test:mobile:allure": "yarn workspace mobile-tests report:allure",
+    "test:all": "yarn test:api && yarn test:mobile",
+    "clean": "yarn workspaces run clean"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "yarn": ">=1.22.0"
+  }
+}
