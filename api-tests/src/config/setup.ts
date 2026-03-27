@@ -3,15 +3,36 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 
+// ── __dirname polyfill ────────────────────────────────────────────────────────
+// Em CJS (ts-node com esm:false) __dirname é global; em ESM é necessário derivar
+// a partir de import.meta.url. A função abaixo cobre os dois casos sem SyntaxError.
+declare const __dirname: string | undefined;
+const _dirname: string = (() => {
+  // Contexto CJS — __dirname já está disponível como global
+  if (typeof __dirname !== 'undefined') return __dirname;
+
+  // Contexto ESM — deriva a partir de import.meta.url
+  // A eval impede que parsers CJS rejeitem a sintaxe import.meta antes da execução
+  try {
+    const { fileURLToPath } = require('url');
+    // eslint-disable-next-line no-new-func
+    const metaUrl = new Function('return import.meta.url')() as string;
+    return path.dirname(fileURLToPath(metaUrl));
+  } catch {
+    // Fallback final: usa o diretório de trabalho (mocha sempre roda de api-tests/)
+    return path.resolve('src/config');
+  }
+})();
+
 // ── ENV ───────────────────────────────────────────────────────────────────────
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(_dirname, '../../.env') });
 
 // ── Diretórios ────────────────────────────────────────────────────────────────
 
-const REPORTS_DIR        = path.resolve(__dirname, '../../reports');
-const ALLURE_RESULTS_DIR = path.resolve(__dirname, '../../allure-results');
-const ALLURE_REPORT_DIR  = path.resolve(__dirname, '../../allure-report');
+const REPORTS_DIR        = path.resolve(_dirname, '../../reports');
+const ALLURE_RESULTS_DIR = path.resolve(_dirname, '../../allure-results');
+const ALLURE_REPORT_DIR  = path.resolve(_dirname, '../../allure-report');
 
 // 🔥 HISTORY (trend)
 const HISTORY_FROM = path.join(ALLURE_REPORT_DIR, 'history');

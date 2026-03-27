@@ -157,6 +157,14 @@ jobs:
         working-directory: mobile-tests
         run: docker compose up -d
 
+      - name: Debug APK inside container
+        run: |
+          echo "Host:"
+          ls -la mobile-tests/apps
+          CONTAINER_ID=$(docker ps -q | head -n 1)
+          echo "Container ID: $CONTAINER_ID"
+          docker exec $CONTAINER_ID ls -la /apps || echo "/apps não encontrado"
+
       - name: Wait for emulator boot
         run: |
           adb wait-for-device
@@ -235,6 +243,14 @@ jobs:
           name: android-allure-results-${{ github.run_number }}
           path: allure-raw/android
         continue-on-error: true
+
+      # ── Diagnóstico: exibe o que foi baixado ──────────────────────────────
+      - name: Listar arquivos baixados
+        run: |
+          echo "=== allure-raw/api ==="
+          find allure-raw/api -type f 2>/dev/null | head -20 || echo "(vazio)"
+          echo "=== allure-raw/android ==="
+          find allure-raw/android -type f 2>/dev/null | head -20 || echo "(vazio)"
 
       # ── Setup Java + Allure CLI ───────────────────────────────────────────
       - name: Setup Java (Allure)
@@ -448,6 +464,9 @@ jobs:
           </body>
           </html>
           EOF
+
+      - name: Listar arquivos do site
+        run: find gh-pages -type f | head -50 || echo "Nenhum arquivo encontrado"
 
       - name: Publish to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4

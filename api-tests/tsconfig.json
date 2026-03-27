@@ -21,7 +21,9 @@
     }
   },
   "ts-node": {
-    "transpileOnly": true
+    "transpileOnly": true,
+    "esm": false,
+    "moduleResolution": "node"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "reports", "allure-results", "allure-report"]
