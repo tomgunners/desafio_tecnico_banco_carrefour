@@ -1,6 +1,8 @@
 import type { Options } from '@wdio/types';
+import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
+import { setupAllure } from '../utils/allure-setup';
 
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
@@ -45,9 +47,6 @@ export const sharedConfig: Partial<Options.Testrunner> = {
    * environment.properties, executor.json e categories.json recém-criados.
    */
   onPrepare() {
-    const fs   = require('fs')   as typeof import('fs');
-    const path = require('path') as typeof import('path');
-
     // 1. Limpa tudo — pasta allure-results/ recriada vazia
     const allureResultsDir = 'allure-results';
     if (fs.existsSync(allureResultsDir)) {
@@ -56,7 +55,6 @@ export const sharedConfig: Partial<Options.Testrunner> = {
     fs.mkdirSync(allureResultsDir, { recursive: true });
 
     // 2. Setup do Allure: restaura history/ de allure-report/history + gera metadados
-    const { setupAllure } = require('../utils/allure-setup');
     setupAllure();
 
     // 3. Diretórios de saída
@@ -77,9 +75,6 @@ export const sharedConfig: Partial<Options.Testrunner> = {
         const screenshotBase64 = await browser.takeScreenshot();
 
         if (screenshotBase64) {
-          const fs   = require('fs')   as typeof import('fs');
-          const path = require('path') as typeof import('path');
-
           const safeTitle     = testTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase();
           const screenshotDir = 'reports/screenshots';
 

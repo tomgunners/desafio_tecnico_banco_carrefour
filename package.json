@@ -9,11 +9,9 @@
   ],
   "scripts": {
     "test:api": "yarn workspace api-tests test",
-    "test:api:report": "yarn workspace api-tests test:report",
-    "test:api:allure": "yarn workspace api-tests allure:report",
+    "test:api:report": "yarn workspace api-tests report:html",
+    "test:api:allure": "yarn workspace api-tests report:allure",
     "test:mobile": "yarn workspace mobile-tests test:android",
-    "test:mobile:android": "yarn workspace mobile-tests test:android",
-    "test:mobile:ios": "yarn workspace mobile-tests test:ios",
     "test:mobile:docker": "yarn workspace mobile-tests docker:test",
     "test:mobile:allure": "yarn workspace mobile-tests report:allure",
     "test:all": "yarn test:api && yarn test:mobile",

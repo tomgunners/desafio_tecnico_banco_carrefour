@@ -134,10 +134,10 @@ jobs:
       - name: Validate APK
         run: |
           if [ ! -f "$APK_PATH" ]; then
-            echo "❌ APK não encontrado em $APK_PATH"
+            echo "APK não encontrado em $APK_PATH"
             exit 1
           fi
-          echo "✅ APK encontrado:"
+          echo "APK encontrado:"
           ls -la mobile-tests/apps
 
       - name: Enable KVM
@@ -157,19 +157,11 @@ jobs:
         working-directory: mobile-tests
         run: docker compose up -d
 
-      - name: Debug APK inside container
-        run: |
-          echo "Host:"
-          ls -la mobile-tests/apps
-          CONTAINER_ID=$(docker ps -q | head -n 1)
-          echo "Container ID: $CONTAINER_ID"
-          docker exec $CONTAINER_ID ls -la /apps || echo "⚠️ /apps não encontrado"
-
       - name: Wait for emulator boot
         run: |
           adb wait-for-device
           until adb shell getprop sys.boot_completed | grep -m 1 '1'; do
-            echo "⏳ aguardando boot..."
+            echo "aguardando boot..."
             sleep 5
           done
           adb shell input keyevent 82
@@ -192,9 +184,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-allure-results-${{ github.run_number }}
-          # O upload pega os arquivos direto da pasta allure-results/
-          # Ao baixar com download-artifact, os arquivos ficam na raiz
-          # do path de destino — sem subpasta extra.
           path: mobile-tests/allure-results/
           if-no-files-found: warn
           retention-days: 7
@@ -219,8 +208,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Faz checkout da branch gh-pages para recuperar o histórico anterior.
-      # continue-on-error: true protege o primeiro run (branch ainda não existe).
       - name: Checkout gh-pages (histórico anterior)
         uses: actions/checkout@v4
         with:
@@ -235,10 +222,6 @@ jobs:
           environment: github-pages
           onlyRemoveDeployments: true
 
-      # ── Download dos artifacts ─────────────────────────────────────────────
-      # O download-artifact@v4 deposita os arquivos diretamente no path
-      # informado, SEM criar subpasta extra com o nome do artifact.
-      # Resultado: allure-raw/api/*.json e allure-raw/android/*.json
       - name: Download Allure results – API
         uses: actions/download-artifact@v4
         with:
@@ -252,14 +235,6 @@ jobs:
           name: android-allure-results-${{ github.run_number }}
           path: allure-raw/android
         continue-on-error: true
-
-      # ── Diagnóstico: exibe o que foi baixado ──────────────────────────────
-      - name: Listar arquivos baixados
-        run: |
-          echo "=== allure-raw/api ==="
-          find allure-raw/api -type f 2>/dev/null | head -20 || echo "(vazio)"
-          echo "=== allure-raw/android ==="
-          find allure-raw/android -type f 2>/dev/null | head -20 || echo "(vazio)"
 
       # ── Setup Java + Allure CLI ───────────────────────────────────────────
       - name: Setup Java (Allure)
@@ -276,10 +251,6 @@ jobs:
           sudo ln -sf /opt/allure-2.27.0/bin/allure /usr/local/bin/allure
           allure --version
 
-      # ── Restaura histórico de trend – API ─────────────────────────────────
-      # allure-raw/api/ já contém os .json de resultado.
-      # Copia gh-pages-prev/api/report/history → allure-raw/api/history/
-      # para que o allure generate inclua o histórico acumulado.
       - name: Restore Allure history – API
         run: |
           RESULTS_DIR="allure-raw/api"
@@ -287,16 +258,11 @@ jobs:
           if [ -d "$HISTORY_SRC" ]; then
             mkdir -p "$RESULTS_DIR/history"
             cp -r "$HISTORY_SRC/." "$RESULTS_DIR/history/"
-            echo "✅ Histórico API restaurado ($(ls $RESULTS_DIR/history | wc -l) arquivos)"
+            echo "Histórico API restaurado ($(ls $RESULTS_DIR/history | wc -l) arquivos)"
           else
-            echo "ℹ️ Nenhum histórico API anterior — primeiro run"
+            echo "Nenhum histórico API anterior — primeiro run"
           fi
 
-      # ── Restaura histórico de trend – Android ─────────────────────────────
-      # IMPORTANTE: allure-raw/android/ já contém os .json de resultado
-      # (download-artifact@v4 NÃO cria subpasta extra).
-      # O erro anterior apontava para allure-raw/android/allure-results/
-      # que não existia, fazendo o allure gerar relatório vazio (só trend).
       - name: Restore Allure history – Android
         run: |
           RESULTS_DIR="allure-raw/android"
@@ -304,9 +270,9 @@ jobs:
           if [ -d "$HISTORY_SRC" ]; then
             mkdir -p "$RESULTS_DIR/history"
             cp -r "$HISTORY_SRC/." "$RESULTS_DIR/history/"
-            echo "✅ Histórico Android restaurado ($(ls $RESULTS_DIR/history | wc -l) arquivos)"
+            echo "Histórico Android restaurado ($(ls $RESULTS_DIR/history | wc -l) arquivos)"
           else
-            echo "ℹ️ Nenhum histórico Android anterior — primeiro run"
+            echo "Nenhum histórico Android anterior — primeiro run"
           fi
 
       # ── Gera relatórios Allure ────────────────────────────────────────────
@@ -315,11 +281,11 @@ jobs:
           RESULTS_DIR="allure-raw/api"
           if [ -d "$RESULTS_DIR" ] && [ "$(ls -A $RESULTS_DIR)" ]; then
             allure generate "$RESULTS_DIR" -o gh-pages/api/report --clean
-            echo "✅ Allure API gerado"
+            echo "Allure API gerado"
           else
             mkdir -p gh-pages/api/report
             echo "<h2>Sem resultados API neste run</h2>" > gh-pages/api/report/index.html
-            echo "⚠️ Sem resultados API"
+            echo "Sem resultados API"
           fi
 
       - name: Generate Allure report – Android
@@ -327,11 +293,11 @@ jobs:
           RESULTS_DIR="allure-raw/android"
           if [ -d "$RESULTS_DIR" ] && [ "$(ls -A $RESULTS_DIR)" ]; then
             allure generate "$RESULTS_DIR" -o gh-pages/android/report --clean
-            echo "✅ Allure Android gerado"
+            echo "Allure Android gerado"
           else
             mkdir -p gh-pages/android/report
             echo "<h2>Sem resultados Android neste run</h2>" > gh-pages/android/report/index.html
-            echo "⚠️ Sem resultados Android"
+            echo "Sem resultados Android"
           fi
 
       # ── Resolve status de cada job ────────────────────────────────────────
@@ -343,9 +309,9 @@ jobs:
 
           badge() {
             case $1 in
-              success)  echo "✅ Passou"  ;;
-              failure)  echo "❌ Falhou"  ;;
-              skipped)  echo "⏭️ Pulado"  ;;
+              success)  echo "Passou"  ;;
+              failure)  echo "Falhou"  ;;
+              skipped)  echo "Pulado"  ;;
               *)        echo "⚠️ $1"      ;;
             esac
           }
@@ -482,9 +448,6 @@ jobs:
           </body>
           </html>
           EOF
-
-      - name: Listar arquivos do site
-        run: find gh-pages -type f | head -50 || echo "Nenhum arquivo encontrado"
 
       - name: Publish to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4

@@ -6,35 +6,33 @@ import { ApiUtils } from '../utils/api.utils';
 import { User, UsersListResponse } from '../schemas/user.types';
 import { AuthResponse } from '../schemas/auth.types';
 
-const userService  = new UserService();
-const authService  = new AuthService();
-
-// IDs obtidos dinamicamente no before() para evitar dependência de dados fixos.
-let validUserId: number;
-let secondUserId: number;
-let authToken:   string;
-
-before(async function () {
-  this.timeout(20000);
-
-  // Busca IDs para os testes CRUD
-  const listResponse = await userService.getAllUsers(2, 0);
-  ApiUtils.assertStatus(listResponse, 200);
-  const body = listResponse.body as UsersListResponse;
-  validUserId  = body.users[0].id;
-  secondUserId = body.users[1].id;
-
-  // Obtém token JWT para testes de endpoint autenticado
-  const authResponse = await authService.login({
-    username: process.env.AUTH_USERNAME ?? 'emilys',
-    password: process.env.AUTH_PASSWORD ?? 'emilyspass',
-  });
-  ApiUtils.assertStatus(authResponse, 200);
-  authToken = (authResponse.body as AuthResponse).accessToken;
-});
+const userService = new UserService();
+const authService = new AuthService();
 
 describe('Users API', function () {
   this.timeout(15000);
+
+  let validUserId:  number;
+  let secondUserId: number;
+  let authToken:    string;
+
+  before(async function () {
+    this.timeout(20000);
+
+    const listResponse = await userService.getAllUsers(2, 0);
+    ApiUtils.assertStatus(listResponse, 200);
+    const body = listResponse.body as UsersListResponse;
+    validUserId  = body.users[0].id;
+    secondUserId = body.users[1].id;
+
+    // Obtém token JWT para testes de endpoint autenticado
+    const authResponse = await authService.login({
+      username: process.env.AUTH_USERNAME ?? 'emilys',
+      password: process.env.AUTH_PASSWORD ?? 'emilyspass',
+    });
+    ApiUtils.assertStatus(authResponse, 200);
+    authToken = (authResponse.body as AuthResponse).accessToken;
+  });
 
   // ─── GET — Listar usuários ───────────────────────────────────────────────────
   describe('GET /users — Listar usuários', function () {
@@ -148,9 +146,8 @@ describe('Users API', function () {
 
   // ─── POST — Criar usuário ────────────────────────────────────────────────────
   describe('POST /users/add — Criar usuário', function () {
-    it('Validar criação de usuário com payload válido e status 201', async function () {
+    it('Validar criação de usuário: status 201, ID positivo e campos espelhados no retorno', async function () {
       const payload = ApiUtils.generateUserPayload();
-
       UserSchema.validateCreatePayload(payload);
 
       const response = await userService.createUser(payload);
@@ -160,35 +157,9 @@ describe('Users API', function () {
       ApiUtils.assertJsonContentType(response);
 
       const createdUser = response.body as User;
-      expect(createdUser).to.have.property('id').that.is.a('number');
+      expect(createdUser).to.have.property('id').that.is.a('number').and.greaterThan(0);
       expect(createdUser.firstName).to.equal(payload.firstName);
       expect(createdUser.lastName).to.equal(payload.lastName);
-      expect(createdUser.email).to.equal(payload.email);
-    });
-
-    it('Verificar geração de novo ID ao criar usuário', async function () {
-      const payload = ApiUtils.generateUserPayload();
-      const response = await userService.createUser(payload);
-      ApiUtils.storeLastResponse(response);
-
-      ApiUtils.assertStatus(response, 201);
-
-      const createdUser = response.body as User;
-      expect(createdUser.id).to.be.a('number').and.to.be.greaterThan(0);
-    });
-
-    it('Validar que o ID retornado na criação é um número positivo válido', async function () {
-      // Nota: a DummyJSON é uma API de mock — não persiste dados entre chamadas.
-      // Este teste valida o contrato da resposta (id positivo, campos espelhados).
-      const payload = ApiUtils.generateUserPayload();
-      const response = await userService.createUser(payload);
-      ApiUtils.storeLastResponse(response);
-
-      ApiUtils.assertStatus(response, 201);
-
-      const createdUser = response.body;
-      expect(createdUser.id).to.be.a('number').and.greaterThan(0);
-      expect(createdUser.firstName).to.equal(payload.firstName);
       expect(createdUser.email).to.equal(payload.email);
     });
   });
@@ -211,8 +182,8 @@ describe('Users API', function () {
     it('Validar atualização de múltiplos campos simultaneamente', async function () {
       const updatePayload = {
         firstName: 'MultiUpdate',
-        lastName: 'Tester',
-        age: 35,
+        lastName:  'Tester',
+        age:       35,
       };
       const response = await userService.updateUser(validUserId, updatePayload);
       ApiUtils.storeLastResponse(response);
@@ -271,7 +242,7 @@ describe('Users API', function () {
 
       for (let i = 0; i < 10; i++) {
         const response = await userService.getUserById(validUserId);
-      ApiUtils.storeLastResponse(response);
+        ApiUtils.storeLastResponse(response);
         results.push(response.status);
       }
 

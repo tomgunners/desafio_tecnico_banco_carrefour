@@ -65,20 +65,15 @@ services:
       # Monta a pasta de apps local dentro do container.
       # O wdio.android.conf.ts usa ANDROID_APP_CONTAINER_PATH=/apps/<nome>.apk
       - ./apps:/apps
-    # /dev/kvm passado para o container quando disponível no host.
-    # Se o WSL2 não expor /dev/kvm corretamente, comente as duas linhas abaixo —
-    # o -no-accel acima garante que o emulador rode mesmo sem acesso ao KVM.
+
     devices:
       - /dev/kvm:/dev/kvm
-    # Shared memory aumentada — o emulador usa /dev/shm extensivamente;
-    # o padrão de 64 MB do Docker causa crashes no display virtual (d_screen/vnc_server).
+
     shm_size: "2gb"
     healthcheck:
-      # Considera o container saudável quando o Appium responder na porta 4723
+
       test: ["CMD", "curl", "-sf", "http://localhost:4723/status"]
       interval: 10s
       timeout: 5s
       retries: 30
-      # Android 14 demora mais para bootar — 120s evita falsos "unhealthy".
-      # Se mesmo assim o healthcheck falhar antes do boot, aumente para 180s.
       start_period: 120s

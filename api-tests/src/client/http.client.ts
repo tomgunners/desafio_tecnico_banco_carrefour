@@ -1,4 +1,4 @@
-import supertest, { Test, Response } from 'supertest';
+import supertest, { Response } from 'supertest';
 import { apiConfig } from '@config/api.config';
 
 export abstract class HttpClient {
@@ -28,6 +28,21 @@ export abstract class HttpClient {
   ): Promise<Response> {
     let req = this.request
       .get(`${this.basePath}${path}`)
+      .set('Authorization', `Bearer ${token}`);
+    if (query) req = req.query(query);
+    return req.timeout(apiConfig.timeout);
+  }
+
+  /**
+   * GET em path absoluto (sem basePath) com cabeçalho Authorization: Bearer <token>.
+   */
+  protected async getAbsoluteWithAuth(
+    absolutePath: string,
+    token: string,
+    query?: Record<string, string | number>
+  ): Promise<Response> {
+    let req = this.request
+      .get(absolutePath)
       .set('Authorization', `Bearer ${token}`);
     if (query) req = req.query(query);
     return req.timeout(apiConfig.timeout);

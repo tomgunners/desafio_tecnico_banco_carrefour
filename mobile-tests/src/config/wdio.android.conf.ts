@@ -29,7 +29,6 @@ export const config: Options.Testrunner = {
     'appium:newCommandTimeout':    Number(process.env.APPIUM_COMMAND_TIMEOUT ?? 300),
     'appium:androidInstallTimeout': 90000,
     'appium:adbExecTimeout':        60000,
-    // Espera implícita: Appium aguarda até 10s antes de lançar NoSuchElement
     'appium:implicitWaitTimeout':   Number(process.env.APPIUM_IMPLICIT_WAIT ?? 10000),
   }],
 };

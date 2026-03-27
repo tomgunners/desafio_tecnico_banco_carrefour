@@ -23,7 +23,6 @@ describe('Auth API — Autenticação JWT', function () {
       ApiUtils.assertJsonContentType(response);
 
       const body = response.body as AuthResponse;
-      // DummyJSON v2 retorna "accessToken" (renomeado de "token" na v1)
       expect(body).to.have.property('accessToken').that.is.a('string').and.not.empty;
       expect(body).to.have.property('refreshToken').that.is.a('string').and.not.empty;
       expect(body).to.have.property('id').that.is.a('number');

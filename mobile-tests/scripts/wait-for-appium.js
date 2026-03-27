@@ -24,7 +24,7 @@ function check() {
         try {
           const json = JSON.parse(body);
           if (json?.value?.ready === true || res.statusCode === 200) {
-            console.log(`\n✔ Appium disponível em http://${HOST}:${PORT}/status`);
+            console.log(`\n Appium disponível em http://${HOST}:${PORT}/status`);
             process.exit(0);
           }
         } catch { /* ainda não pronto */ }
@@ -38,7 +38,7 @@ function check() {
 
 function retry() {
   if (Date.now() >= deadline) {
-    console.error(`\n✖ Appium não respondeu em ${TIMEOUT / 1000}s.`);
+    console.error(`\n Appium não respondeu em ${TIMEOUT / 1000}s.`);
     process.exit(1);
   }
   process.stdout.write('.');

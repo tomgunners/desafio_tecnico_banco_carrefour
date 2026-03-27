@@ -16,14 +16,13 @@ export const mochaHooks = {
       body: response.body,
     };
 
-    // Mochawesome — exibe na seção "Context" do card do teste
     try {
       addContext(this, {
         title: `HTTP Response — ${response.status}`,
         value: evidence,
       });
-    } catch {
-
+    } catch (err) {
+      console.warn('[hooks] Falha ao adicionar contexto no Mochawesome:', err);
     }
 
     try {
@@ -32,8 +31,8 @@ export const mochaHooks = {
         JSON.stringify(evidence, null, 2),
         'application/json'
       );
-    } catch {
-
+    } catch (err) {
+      console.warn('[hooks] Falha ao adicionar anexo no Allure:', err);
     }
   },
 

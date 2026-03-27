@@ -1,17 +1,10 @@
 import { Response } from 'supertest';
-import supertest from 'supertest';
 import { HttpClient } from './http.client';
 import { LoginPayload } from '@schemas/auth.types';
-import { apiConfig } from '@config/api.config';
 
 export class AuthService extends HttpClient {
-  // Request separado para o endpoint /auth/refresh
-  // que exige Authorization: Bearer no header (não body)
-  private readonly authRequest: ReturnType<typeof supertest>;
-
   constructor() {
     super('/auth');
-    this.authRequest = supertest(apiConfig.baseUrl);
   }
 
   /**
@@ -30,12 +23,9 @@ export class AuthService extends HttpClient {
 
   /**
    * POST /auth/refresh — Renova o accessToken usando o refreshToken.
+   * Usa this.post() da superclasse em vez de um request duplicado.
    */
   async refresh(refreshToken: string, expiresInMins = 30): Promise<Response> {
-    return this.authRequest
-      .post('/auth/refresh')
-      .set('Content-Type', 'application/json')
-      .send({ refreshToken, expiresInMins })
-      .timeout(apiConfig.timeout);
+    return this.post('/refresh', { refreshToken, expiresInMins });
   }
 }

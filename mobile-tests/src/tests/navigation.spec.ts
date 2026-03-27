@@ -1,6 +1,7 @@
 import { HomeScreen } from '../pages/home.screen';
 import { HomeLocators } from '../locators/home.locators';
-
+import { LoginLocators } from '../locators/login.locators';
+import { FormsLocators } from '../locators/forms.locators';
 
 describe('Navegação entre telas', () => {
   const home = new HomeScreen();
@@ -29,7 +30,7 @@ describe('Navegação entre telas', () => {
     await home.goToLogin();
 
     // A tela de Login deve exibir o campo de email após a navegação
-    const loginFieldVisible = await home.isMenuItemVisible('~input-email');
+    const loginFieldVisible = await home.isMenuItemVisible(LoginLocators.usernameField);
     expect(loginFieldVisible).toBe(true);
   });
 
@@ -37,7 +38,7 @@ describe('Navegação entre telas', () => {
     await home.goToForms();
 
     // A tela de Forms deve exibir o campo de input após a navegação
-    const formsFieldVisible = await home.isMenuItemVisible('~text-input');
+    const formsFieldVisible = await home.isMenuItemVisible(FormsLocators.inputField);
     expect(formsFieldVisible).toBe(true);
   });
 });

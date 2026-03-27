@@ -30,8 +30,6 @@ export class LoginScreen extends BasePage {
     await this.tap(LoginLocators.loginButton);
   }
 
-  // Retorna o texto do primeiro erro de campo visível.
-  // Retorna string vazia se nenhum erro estiver visível (consistente com hasError()).
   async getErrorMessage(): Promise<string> {
     const [emailVisible, passwordVisible] = await Promise.all([
       this.isDisplayed(LoginLocators.emailErrorMessage),

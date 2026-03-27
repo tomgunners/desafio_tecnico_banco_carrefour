@@ -123,8 +123,6 @@ function restoreHistory(): void {
   if (fs.existsSync(historyFrom)) {
     ensureDir(historyTo);
     fs.cpSync(historyFrom, historyTo, { recursive: true });
-  } else {
-    
   }
 }
 

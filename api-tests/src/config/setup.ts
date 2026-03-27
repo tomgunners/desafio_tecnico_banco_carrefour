@@ -2,11 +2,6 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { fileURLToPath } from 'url';
-
-// ✅ FIX para ESM (Node 22)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // ── ENV ───────────────────────────────────────────────────────────────────────
 
@@ -34,8 +29,6 @@ for (const dir of [REPORTS_DIR, ALLURE_RESULTS_DIR]) {
   ensureDir(dir);
 }
 
-// ── Restore history (ESSENCIAL PRO TREND) ─────────────────────────────────────
-
 function restoreHistory() {
   if (fs.existsSync(HISTORY_FROM)) {
     ensureDir(HISTORY_TO);
@@ -44,13 +37,12 @@ function restoreHistory() {
       recursive: true,
     });
 
-    console.log('✅ Allure history restaurado com sucesso');
+    console.log('Histórico restaurado com sucesso');
   } else {
-    console.log('⚠️ Nenhum histórico anterior encontrado');
+    console.log('Nenhum histórico anterior encontrado');
   }
 }
 
-// ⚠️ TEM QUE SER ANTES de escrever os arquivos
 restoreHistory();
 
 // ── Metadados ────────────────────────────────────────────────────────────────

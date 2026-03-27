@@ -58,5 +58,4 @@ export const ApiUtils = {
       password:  'Test@1234',
     };
   },
-
 };

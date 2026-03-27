@@ -20,9 +20,7 @@ describe('Formulários', () => {
 
   it('Validar que campo de texto aceita entrada vazia sem erro', async () => {
     await forms.typeInField('');
-    // Sem exceção lançada — campo aceita string vazia
     const isFieldVisible = await forms.isActiveButtonVisible();
-    // Apenas confirma que a tela ainda está funcional
     expect(typeof isFieldVisible).toBe('boolean');
   });
 
