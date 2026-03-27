@@ -1,4 +1,0 @@
-{
-  "using": "xpath",
-  "value": "//*[@text=\"Click to turn the switch OFF\"]"
-}

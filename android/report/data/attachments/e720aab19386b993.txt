@@ -1,4 +1,0 @@
-{
-  "using": "xpath",
-  "value": "//*[@text=\"Please enter a valid email address\"]"
-}
