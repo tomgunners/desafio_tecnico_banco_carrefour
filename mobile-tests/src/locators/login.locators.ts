@@ -19,6 +19,9 @@ export const LoginLocators = {
 
   successContainer:     'id=com.wdiodemoapp:id/parentPanel', // Dialog de sucesso (Android)
   successTextElement:   'android.widget.TextView',           // Textos dentro do dialog
+  // Botão OK do AlertDialog padrão Android (android:id/button1 = positive button)
+  // É um ID de sistema — funciona em qualquer AlertDialog nativo
+  successOkButton:      'id=android:id/button1',
 } as const;
 
 export type LoginLocatorKey = keyof typeof LoginLocators;

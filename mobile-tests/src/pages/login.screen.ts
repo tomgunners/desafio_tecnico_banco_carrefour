@@ -10,25 +10,6 @@ export class LoginScreen extends BasePage {
     await this.waitForDisplayed(LoginLocators.usernameField);
   }
 
-  /**
-   * Fecha qualquer dialog/overlay aberto usando o botão Voltar do Android.
-   * Necessário após login bem-sucedido, que exibe um dialog de confirmação
-   * que bloqueia a navegação da barra inferior.
-   * Falha silenciosa — se não houver dialog, não causa erro.
-   */
-  async dismissOpenDialog(): Promise<void> {
-    try {
-      const dialogVisible = await this.isDisplayed(LoginLocators.successContainer);
-      if (dialogVisible) {
-        await browser.back();
-        // Aguarda o dialog fechar antes de continuar
-        await browser.pause(500);
-      }
-    } catch {
-      // Sem dialog aberto — sem problema
-    }
-  }
-
   async login(credentials: UserCredentials): Promise<void> {
     await this.fill(LoginLocators.usernameField, credentials.username);
     await this.fill(LoginLocators.passwordField, credentials.password);
@@ -48,7 +29,8 @@ export class LoginScreen extends BasePage {
   }
 
   async verifyLoginSuccess(): Promise<void> {
-    const container = await $(LoginLocators.successContainer);
+    // Aguarda o dialog aparecer com retry — o app pode demorar a exibi-lo
+    const container = await this.waitForDisplayed(LoginLocators.successContainer);
     const textElements = await container.$$(LoginLocators.successTextElement);
     const allTexts = await Promise.all(
       Array.from(textElements).map(el => el.getText())
@@ -56,6 +38,39 @@ export class LoginScreen extends BasePage {
 
     expect(allTexts).toContain('Success');
     expect(allTexts).toContain('You are logged in!');
+
+    // IMPORTANTE: descarta o dialog imediatamente após verificar.
+    // Responsabilidade do teste — não do beforeEach.
+    // O botão OK (android:id/button1) é o botão positivo padrão do AlertDialog Android.
+    await this.dismissSuccessDialog();
+  }
+
+  /**
+   * Clica no botão OK do dialog de sucesso para fechá-lo.
+   * Usa o ID de sistema android:id/button1 (positive button do AlertDialog).
+   * Fallback: pressKeyCode(4) = botão Back do Android (mais confiável que browser.back()
+   * em apps nativos via Appium).
+   */
+  async dismissSuccessDialog(): Promise<void> {
+    try {
+      const okButton = await $(LoginLocators.successOkButton);
+      const isVisible = await okButton.isDisplayed();
+      if (isVisible) {
+        await okButton.click();
+        await browser.pause(400); // aguarda animação de fechamento do dialog
+        return;
+      }
+    } catch {
+      // Botão OK não encontrado — tenta pressKeyCode como fallback
+    }
+    try {
+      // pressKeyCode(4) = KEYCODE_BACK — método correto em Appium para apps nativos
+      // browser.back() pode não funcionar em WebView ou estados de navegação específicos
+      await browser.pressKeyCode(4);
+      await browser.pause(400);
+    } catch {
+      // Nenhuma ação necessária
+    }
   }
 
   async tapLoginWithoutCredentials(): Promise<void> {
