@@ -1,13 +1,18 @@
-import { HomeScreen } from '../pages/home.screen';
+import { HomeScreen }   from '../pages/home.screen';
 import { HomeLocators } from '../locators/home.locators';
 import { LoginLocators } from '../locators/login.locators';
 import { FormsLocators } from '../locators/forms.locators';
 
+// Melhoria #07: sessão única por suíte
 describe('Navegação entre telas', () => {
   const home = new HomeScreen();
 
+  before(async () => {
+    await home.waitForScreen();
+  });
+
+  // Reset: volta para Home antes de cada teste de navegação
   beforeEach(async () => {
-    await browser.reloadSession();
     await home.waitForScreen();
   });
 
@@ -28,16 +33,12 @@ describe('Navegação entre telas', () => {
 
   it('Verificar navegação para a tela de Login via menu inferior', async () => {
     await home.goToLogin();
-
-    // A tela de Login deve exibir o campo de email após a navegação
     const loginFieldVisible = await home.isMenuItemVisible(LoginLocators.usernameField);
     expect(loginFieldVisible).toBe(true);
   });
 
   it('Verificar navegação para a tela de Formulários via menu inferior', async () => {
     await home.goToForms();
-
-    // A tela de Forms deve exibir o campo de input após a navegação
     const formsFieldVisible = await home.isMenuItemVisible(FormsLocators.inputField);
     expect(formsFieldVisible).toBe(true);
   });

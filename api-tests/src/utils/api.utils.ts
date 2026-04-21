@@ -1,32 +1,29 @@
 /**
- * - Assertions reutilizáveis sobre respostas HTTP
- * - Buffer da última resposta para uso nos hooks de evidência
- * - Gerador de payload para testes de criação
+ * Assertions reutilizáveis sobre respostas HTTP,
+ * buffer da última resposta para hooks de evidência,
+ * e gerador de payload para testes de criação.
  */
 
 import { expect } from 'chai';
 import { Response } from 'supertest';
 
-// Buffer da última resposta — lido pelo hook afterEach em caso de falha
 let _lastResponse: Response | null = null;
 
 export const ApiUtils = {
 
   // ── Buffer de resposta ────────────────────────────────────────────────────
 
-  /** Armazena a resposta do teste atual para eventual captura de evidência. */
   storeLastResponse(response: Response): void {
     _lastResponse = response;
   },
 
-  /** Retorna e limpa o buffer. Chamado pelo Root Hooks Plugin. */
   getLastResponse(): Response | null {
     const response = _lastResponse;
     _lastResponse  = null;
     return response;
   },
 
-  // ── Assertions ────────────────────────────────────────────────────────────
+  // ── Assertions HTTP ───────────────────────────────────────────────────────
 
   assertStatus(response: Response, expected: number): void {
     expect(response.status).to.equal(

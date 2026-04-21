@@ -1,10 +1,19 @@
 import { FormsScreen } from '../pages/forms.screen';
+import { HomeScreen }  from '../pages/home.screen';
 
+// Melhoria #07: sessão única por suíte + reset leve entre testes
 describe('Formulários', () => {
   const forms = new FormsScreen();
+  const home  = new HomeScreen();
 
+  // Uma sessão por suíte
+  before(async () => {
+    await home.waitForScreen();
+    await forms.waitForScreen();
+  });
+
+  // Reset leve: volta para a tela de Forms sem recriar sessão
   beforeEach(async () => {
-    await browser.reloadSession();
     await forms.waitForScreen();
   });
 
@@ -27,28 +36,21 @@ describe('Formulários', () => {
   // ── Switch ────────────────────────────────────────────────────────────────────
 
   it('Validar alternância do switch de inativo para ativo', async () => {
-    // Estado inicial: inativo
     const initiallyInactive = await forms.isSwitchInactive();
     expect(initiallyInactive).toBe(true);
 
-    // Aciona o switch
     await forms.tapSwitch();
 
-    // Deve estar ativo após o toque
     const nowActive = await forms.isSwitchActive();
     expect(nowActive).toBe(true);
   });
 
   it('Validar alternância do switch de ativo para inativo', async () => {
-    // Liga o switch
     await forms.tapSwitch();
-    const isActive = await forms.isSwitchActive();
-    expect(isActive).toBe(true);
+    expect(await forms.isSwitchActive()).toBe(true);
 
-    // Desliga o switch
     await forms.tapSwitch();
-    const isInactive = await forms.isSwitchInactive();
-    expect(isInactive).toBe(true);
+    expect(await forms.isSwitchInactive()).toBe(true);
   });
 
   // ── Dropdown ──────────────────────────────────────────────────────────────────

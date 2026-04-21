@@ -1,7 +1,7 @@
 {
   "name": "test-automation-monorepo",
-  "version": "1.0.0",
-  "description": "Monorepo de automação de testes — Desafio Banco Carrefour",
+  "version": "1.3.0",
+  "description": "Monorepo de automação de testes — Desafio Banco Carrefour (Zod edition)",
   "private": true,
   "workspaces": [
     "api-tests",

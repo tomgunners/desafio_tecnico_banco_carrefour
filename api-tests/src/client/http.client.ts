@@ -64,6 +64,11 @@ export abstract class HttpClient {
       .timeout(apiConfig.timeout);
   }
 
+  /**
+   * @reserved Nenhum endpoint PATCH está documentado na DummyJSON atualmente.
+   * Mantido para extensibilidade — usar quando um endpoint PATCH for adicionado.
+   * Se não for utilizado após 6 meses, remover.
+   */
   protected async patch(path: string, body: object): Promise<Response> {
     return this.request
       .patch(`${this.basePath}${path}`)

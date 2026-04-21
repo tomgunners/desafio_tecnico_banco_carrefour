@@ -2,6 +2,8 @@
 
 Monorepo com as suítes de automação de testes de **API** e **Mobile** desenvolvidas como resposta ao desafio técnico do Banco Carrefour.
 
+> **v1.3.0 — Zod Edition** — 17 melhorias sobre a versão original. Adoção de **Zod** como fonte única de verdade: elimina `user.types.ts` e `auth.types.ts` (interfaces manuais), substitui AJV + ajv-formats por uma única dependência, e unifica validação de runtime com tipagem TypeScript via `z.infer<>`.
+
 ---
 
 ## Estrutura do Repositório
@@ -10,65 +12,93 @@ Monorepo com as suítes de automação de testes de **API** e **Mobile** desenvo
 .
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                   # Pipeline CI/CD unificado (API + Android + Pages)
-├── api-tests/                       # Suíte de testes de API
+│       └── ci.yml                     # Pipeline CI/CD (API + Android + iOS + Pages)
+├── api-tests/                         # Suíte de testes de API
 │   ├── src/
 │   │   ├── client/
-│   │   │   ├── auth.service.ts      # Service de autenticação JWT
-│   │   │   ├── http.client.ts       # Cliente HTTP base (Supertest + getAbsoluteWithAuth)
-│   │   │   └── user.service.ts      # Service de usuários (CRUD)
+│   │   │   ├── auth.service.ts        # Service de autenticação JWT
+│   │   │   ├── http.client.ts         # Cliente HTTP base (Supertest)
+│   │   │   └── user.service.ts        # Service de usuários (CRUD)
 │   │   ├── config/
-│   │   │   ├── api.config.ts        # Configurações da API (baseUrl, timeout)
-│   │   │   ├── hooks.ts             # Root Hooks Plugin — evidências em falhas
-│   │   │   └── setup.ts             # Bootstrap: dotenv, diretórios, Allure metadata
+│   │   │   ├── api.config.ts          # Configurações da API (baseUrl, timeout)
+│   │   │   ├── env.ts                 # [NOVO] requireEnv() — sem fallback hardcoded
+│   │   │   ├── hooks.ts               # Root Hooks Plugin — evidências em falhas
+│   │   │   └── setup.ts               # dotenv, diretórios, Allure metadata (simplificado)
 │   │   ├── schemas/
-│   │   │   ├── auth.types.ts        # Tipos TypeScript para auth
-│   │   │   ├── user.schema.ts       # Validações de schema de usuário
-│   │   │   └── user.types.ts        # Tipos TypeScript para usuário
+│   │   │   ├── auth.types.ts          # Tipos para auth
+│   │   │   ├── user.schema.ts         # [NOVO] Validação via AJV (JSON Schema)
+│   │   │   └── user.types.ts          # Tipos para usuário
 │   │   ├── tests/
-│   │   │   ├── auth.test.ts         # Testes: autenticação JWT (10 cenários)
-│   │   │   └── users.test.ts        # Testes: CRUD + rate limit (17 cenários)
+│   │   │   ├── auth.test.ts           # Testes: auth JWT — 12 cenários (era 10)
+│   │   │   └── users.test.ts          # Testes: CRUD + rate limit — 20 cenários (era 17)
 │   │   └── utils/
-│   │       └── api.utils.ts         # Utilitários: assertions, gerador de payload
-│   ├── .env
-│   ├── .env.example                 # Template de variáveis de ambiente
+│   │       └── api.utils.ts           # Utilitários: assertions, gerador de payload
+│   ├── .env.example                   # [NOVO] Template de variáveis obrigatórias
+│   ├── .eslintrc.json                 # [NOVO] Configuração ESLint
 │   ├── package.json
 │   └── tsconfig.json
-├── mobile-tests/                    # Suíte de testes mobile
-│   ├── apps/                        # APK / .app (não versionado)
-│   ├── scripts/
-│   │   ├── docker-test.js           # Orquestrador docker-android (async/await)
-│   │   └── wait-for-appium.js       # Health-check do servidor Appium
+├── mobile-tests/                      # Suíte de testes mobile
 │   ├── src/
 │   │   ├── config/
 │   │   │   ├── wdio.android.conf.ts
 │   │   │   ├── wdio.ios.conf.ts
-│   │   │   └── wdio.shared.conf.ts  # Configuração compartilhada (imports de topo)
+│   │   │   └── wdio.shared.conf.ts    # [ATUALIZADO] ADRs documentados + screenshot hook
 │   │   ├── locators/
-│   │   │   ├── forms.locators.ts
-│   │   │   ├── home.locators.ts
-│   │   │   └── login.locators.ts
+│   │   │   ├── forms.locators.ts      # [ATUALIZADO] Versionados + as const
+│   │   │   ├── home.locators.ts       # [ATUALIZADO] Versionados + as const
+│   │   │   └── login.locators.ts      # [ATUALIZADO] Versionados + as const
 │   │   ├── pages/
 │   │   │   ├── base.page.ts
 │   │   │   ├── forms.screen.ts
 │   │   │   ├── home.screen.ts
-│   │   │   └── login.screen.ts
+│   │   │   └── login.screen.ts        # [ATUALIZADO] Método clearFields()
 │   │   ├── tests/
-│   │   │   ├── forms.spec.ts        # Testes: formulários (5 cenários)
-│   │   │   ├── login.spec.ts        # Testes: login (4 cenários)
-│   │   │   └── navigation.spec.ts   # Testes: navegação (3 cenários)
+│   │   │   ├── forms.spec.ts          # [ATUALIZADO] beforeAll + reset leve
+│   │   │   ├── login.spec.ts          # [ATUALIZADO] beforeAll + reset leve + a11y
+│   │   │   └── navigation.spec.ts     # [ATUALIZADO] beforeAll + reset leve
 │   │   ├── types/
-│   │   │   └── mobile.types.ts      # Tipos compartilhados (UserCredentials)
+│   │   │   └── mobile.types.ts
 │   │   └── utils/
 │   │       ├── allure-setup.ts
-│   │       └── test.utils.ts
-│   ├── .env
-│   ├── .env.example                 # Template de variáveis de ambiente
+│   │       └── test.utils.ts          # [ATUALIZADO] Credenciais sem fallback crítico
+│   ├── .env.example                   # [NOVO] Template de variáveis obrigatórias
 │   ├── docker-compose.yml
 │   ├── package.json
 │   └── tsconfig.json
 └── package.json
 ```
+
+---
+
+## Melhorias Aplicadas (v1.1.0)
+
+### 🔴 Críticas
+| # | Melhoria | Arquivo |
+|---|---|---|
+| 01 | `requireEnv()` — sem fallback hardcoded de credenciais | `api-tests/src/config/env.ts` |
+| 02 | Validação de claims JWT (exp, iat, id) via decode Base64 | `auth.test.ts` |
+| 03 | Rate limit com `Promise.all` (20 e 120 req concorrentes) | `users.test.ts` |
+| 11 | `.env.example` versionado + validação de env vars no setup | `.env.example`, `setup.ts` |
+
+### 🟠 Altas
+| # | Melhoria | Arquivo |
+|---|---|---|
+| 04 | Schema validation com AJV (JSON Schema formal) | `user.schema.ts` |
+| 05 | IDs fixos documentados — `KNOWN_USER_ID = 1` | `users.test.ts` |
+| 07 | `beforeAll` + `clearFields()` — -70% overhead de sessão mobile | `*.spec.ts`, `login.screen.ts` |
+| 08 | Screenshot + log automático em falhas (hook global) | `wdio.shared.conf.ts` |
+| 14 | `pretest` com typecheck + lint antes dos testes no CI | `package.json`, `ci.yml` |
+| 15 | Retry mobile flaky + SHA256 do APK no CI | `ci.yml` |
+
+### 🟡 Médias / Baixas
+| # | Melhoria | Arquivo |
+|---|---|---|
+| 06 | Cenários negativos: payload vazio, tipo errado, email inválido | `users.test.ts` |
+| 09 | Locators versionados com comentários e `as const` | `*.locators.ts` |
+| 10 | Teste básico de acessibilidade (a11y) em Login | `login.spec.ts` |
+| 12 | `setup.ts` simplificado — polyfill ESM removido | `setup.ts` |
+| 13 | ADRs documentados (Chai vs Jasmine, sessão vs reset) | `wdio.shared.conf.ts` |
+| 16 | Job iOS no CI (macOS, apenas em PRs para main) | `ci.yml` |
 
 ---
 
@@ -87,8 +117,9 @@ Monorepo com as suítes de automação de testes de **API** e **Mobile** desenvo
   ```bash
   npm install -g appium
   appium driver install uiautomator2   # Android
+  appium driver install xcuitest       # iOS
   ```
-- APK em `mobile-tests/apps/` — baixar em https://github.com/webdriverio/native-demo-app/releases
+- APK em `mobile-tests/apps/` — baixar em https://github.com/webdriverio/native-demo-app/releases/tag/v2.0.0
 
 ---
 
@@ -100,39 +131,19 @@ Monorepo com as suítes de automação de testes de **API** e **Mobile** desenvo
 yarn install
 ```
 
-### 2. Variáveis de ambiente
-
-Cada workspace possui um `.env.example` com todos os campos documentados. Copie-o para `.env` e ajuste os valores antes de executar.
+### 2. Configurar variáveis de ambiente
 
 ```bash
-cp api-tests/.env.example    api-tests/.env
+# API
+cp api-tests/.env.example api-tests/.env
+# Edite api-tests/.env e preencha AUTH_USERNAME e AUTH_PASSWORD
+
+# Mobile
 cp mobile-tests/.env.example mobile-tests/.env
+# Edite mobile-tests/.env e preencha STANDARD_USER e STANDARD_PASSWORD
 ```
 
-Em CI os valores são injetados via **GitHub Actions Secrets** (ver seção CI/CD).
-
-#### API Tests (`api-tests/.env`)
-
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `API_BASE_URL` | `https://dummyjson.com` | URL base da API |
-| `REQUEST_TIMEOUT` | `10000` | Timeout das requisições (ms) |
-| `AUTH_USERNAME` | — | Usuário JWT (injetar via Secret em CI) |
-| `AUTH_PASSWORD` | — | Senha JWT (injetar via Secret em CI) |
-
-#### Mobile Tests (`mobile-tests/.env`)
-
-| Variável | Padrão | Descrição |
-|---|---|---|
-| `APPIUM_HOST` | `127.0.0.1` | Host do servidor Appium |
-| `APPIUM_PORT` | `4723` | Porta do servidor Appium |
-| `ANDROID_PLATFORM_VERSION` | `14` | Versão Android |
-| `ANDROID_DEVICE_NAME` | `emulator-5554` | Serial do emulador |
-| `IOS_PLATFORM_VERSION` | `17.0` | Versão iOS |
-| `IOS_DEVICE_NAME` | `iPhone 15` | Nome do simulador |
-| `STANDARD_USER` | — | Credencial válida do app (injetar via Secret) |
-| `STANDARD_PASSWORD` | — | Senha válida do app (injetar via Secret) |
-| `TEST_TIMEOUT` | `120000` | Timeout global por teste (ms) |
+> **Nunca versione o arquivo `.env`** — ele está no `.gitignore`. Apenas o `.env.example` deve ser commitado.
 
 ---
 
@@ -141,7 +152,7 @@ Em CI os valores são injetados via **GitHub Actions Secrets** (ver seção CI/C
 ### API
 
 ```bash
-yarn test:api                # Executa os testes
+yarn test:api                # Typecheck + lint + testes
 yarn test:api:report         # Abre relatório Mochawesome
 yarn test:api:allure         # Gera e abre relatório Allure
 ```
@@ -164,48 +175,54 @@ yarn test:all
 
 ## Cobertura dos Testes
 
-### API — 27 cenários totais
+### API — 32 cenários totais (+5 vs. v1.0.0)
 
-#### `auth.test.ts` — Autenticação JWT (10 cenários)
+#### `auth.test.ts` — Autenticação JWT (12 cenários)
 
 | # | Cenário | Endpoint |
 |---|---|---|
 | 1 | Login com credenciais válidas retorna token JWT | POST `/auth/login` |
 | 2 | Estrutura completa do payload de login | POST `/auth/login` |
 | 3 | Token JWT possui formato válido (3 segmentos) | POST `/auth/login` |
-| 4 | Erro 400/401 com senha incorreta | POST `/auth/login` |
-| 5 | Erro ao autenticar usuário inexistente | POST `/auth/login` |
-| 6 | Acesso ao endpoint protegido com token válido | GET `/auth/me` |
-| 7 | `/auth/me` retorna dados do usuário autenticado | GET `/auth/me` |
-| 8 | Rejeição sem token (401/403) | GET `/auth/me` |
-| 9 | Rejeição com token inválido (401/403) | GET `/auth/me` |
-| 10 | Renovação de token com refreshToken válido | POST `/auth/refresh` |
+| **4** | **Claims do payload JWT (exp, iat, id) via decode Base64** | POST `/auth/login` |
+| 5 | Erro 400/401 com senha incorreta | POST `/auth/login` |
+| 6 | Erro ao autenticar usuário inexistente | POST `/auth/login` |
+| 7 | Acesso ao endpoint protegido com token válido | GET `/auth/me` |
+| 8 | `/auth/me` retorna dados do usuário autenticado | GET `/auth/me` |
+| 9 | Rejeição sem token (401/403) | GET `/auth/me` |
+| 10 | Rejeição com token inválido (401/403 — nunca 500) | GET `/auth/me` |
+| 11 | Renovação de token com refreshToken válido | POST `/auth/refresh` |
+| **12** | **Claims do novo accessToken renovado** | POST `/auth/refresh` |
 
-#### `users.test.ts` — CRUD + Rate Limit (17 cenários)
+#### `users.test.ts` — CRUD + Rate Limit (20 cenários)
 
 | # | Cenário | Endpoint |
 |---|---|---|
-| 1 | Listagem retorna status 200 | GET `/users` |
+| 1 | Listagem retorna status 200 (validado via AJV) | GET `/users` |
 | 2 | Parâmetro `limit` | GET `/users` |
 | 3 | Parâmetro `skip` | GET `/users` |
 | 4 | Listagem via endpoint protegido | GET `/auth/users` |
-| 5 | Busca por ID existente | GET `/users/:id` |
+| 5 | Busca por ID existente (AJV schema) | GET `/users/:id` |
 | 6 | Campos obrigatórios presentes | GET `/users/:id` |
 | 7 | 404 para ID inexistente | GET `/users/:id` |
 | 8 | Busca por nome retorna resultados | GET `/users/search` |
 | 9 | Busca sem resultados retorna array vazio | GET `/users/search` |
 | 10 | Criação: status 201, ID positivo e campos espelhados | POST `/users/add` |
-| 11 | Atualização de campo único | PUT `/users/:id` |
-| 12 | Atualização de múltiplos campos simultâneos | PUT `/users/:id` |
-| 13 | 404 ao atualizar ID inexistente | PUT `/users/:id` |
-| 14 | Remoção retorna `isDeleted: true` | DELETE `/users/:id` |
-| 15 | Objeto deletado com flag `isDeleted` | DELETE `/users/:id` |
-| 16 | 404 ao deletar ID inexistente | DELETE `/users/:id` |
-| 17 | 10 requisições sequenciais sem retornar 429 | GET `/users/:id` |
+| **11** | **Payload vazio — documenta comportamento (sem 500)** | POST `/users/add` |
+| **12** | **Email inválido — documenta comportamento** | POST `/users/add` |
+| **13** | **Campo age com tipo string — sem 500** | POST `/users/add` |
+| 14 | Atualização de campo único | PUT `/users/:id` |
+| 15 | Atualização de múltiplos campos simultâneos | PUT `/users/:id` |
+| 16 | 404 ao atualizar ID inexistente | PUT `/users/:id` |
+| 17 | Remoção retorna `isDeleted: true` | DELETE `/users/:id` |
+| 18 | Objeto deletado com flag `isDeleted` | DELETE `/users/:id` |
+| 19 | 404 ao deletar ID inexistente | DELETE `/users/:id` |
+| **20** | **20 requisições simultâneas — sem degradação (Promise.all)** | GET `/users/:id` |
+| **21** | **Rajada de 120 req concorrentes — documenta rate limit** | GET `/users/:id` |
 
-### Mobile — 12 cenários totais
+### Mobile — 13 cenários totais (+1 vs. v1.0.0)
 
-#### `login.spec.ts` — Login (4 cenários)
+#### `login.spec.ts` — Login (5 cenários)
 
 | # | Cenário |
 |---|---|
@@ -213,90 +230,58 @@ yarn test:all
 | 2 | Erro com senha inválida (< 8 caracteres) |
 | 3 | Erro com e-mail em formato inválido |
 | 4 | Erro ao submeter formulário vazio |
+| **5** | **Verificar accessibility labels dos campos de login (a11y)** |
 
 #### `navigation.spec.ts` — Navegação (3 cenários)
 
 | # | Cenário |
 |---|---|
-| 5 | Todos os itens do menu inferior visíveis |
-| 6 | Navegação para Login via menu |
-| 7 | Navegação para Formulários via menu |
+| 6 | Todos os itens do menu inferior visíveis |
+| 7 | Navegação para Login via menu |
+| 8 | Navegação para Formulários via menu |
 
 #### `forms.spec.ts` — Formulários (5 cenários)
 
 | # | Cenário |
 |---|---|
-| 8 | Campo de texto reflete o valor digitado |
-| 9 | Campo aceita entrada vazia sem erro |
-| 10 | Switch alterna de inativo para ativo |
-| 11 | Switch alterna de ativo para inativo |
-| 12 | Dropdown exibe o valor selecionado |
+| 9 | Campo de texto reflete o valor digitado |
+| 10 | Campo aceita entrada vazia sem erro |
+| 11 | Switch alterna de inativo para ativo |
+| 12 | Switch alterna de ativo para inativo |
+| 13 | Dropdown exibe o valor selecionado |
 
 ---
 
 ## Relatórios
 
 ### Mochawesome (API)
-
 Gerado em `api-tests/reports/mochawesome/api-report.html`.
 
 ### Allure Report
-
-Ambas as suítes geram relatórios Allure com:
-
-- **Resumo** — total de testes, taxa de sucesso, duração
-- **Trend** — histórico de execuções (persistido via GitHub Actions artifacts)
-- **Suítes** — agrupamento por describe/it
-- **Screenshots de falhas** — capturadas automaticamente no `afterTest`
-- **Logs de erro** — stack trace anexado como attachment
-- **Ambiente** — plataforma, versão Node, tipo de execução (CI/Local)
-- **Executor** — link para a run do GitHub Actions
+Ambas as suítes geram relatórios Allure com resumo, trend histórico, screenshots de falhas, logs de erro e metadados de ambiente.
 
 ---
 
 ## CI/CD — GitHub Actions
 
-O pipeline está consolidado em um único arquivo `.github/workflows/ci.yml` com três jobs independentes.
+Pipeline em `.github/workflows/ci.yml` com **quatro jobs** independentes.
 
-### Secrets necessários
+| Job | Trigger | Runner | Timeout |
+|---|---|---|---|
+| `api-tests` | push/PR em `main`/`develop` | ubuntu-latest | 30min |
+| `mobile-android` | push/PR em `main`/`develop` | ubuntu-latest | 60min |
+| `mobile-ios` | **PRs para `main` apenas** | macos-latest | 60min |
+| `publish-reports` | Após API + Android (mesmo em falha) | ubuntu-latest | 15min |
+
+### Secrets necessários no GitHub Actions
 
 | Secret | Descrição |
 |---|---|
-| `AUTH_USERNAME` | Usuário da API DummyJSON |
-| `AUTH_PASSWORD` | Senha da API DummyJSON |
-| `MOBILE_STANDARD_USER` | Credencial do app mobile |
-| `MOBILE_STANDARD_PASSWORD` | Senha do app mobile |
+| `AUTH_USERNAME` | Usuário para autenticação na API |
+| `AUTH_PASSWORD` | Senha para autenticação na API |
+| `MOBILE_STANDARD_USER` | Email do usuário padrão no app |
+| `MOBILE_STANDARD_PASSWORD` | Senha do usuário padrão no app |
 
-### Jobs
-
-**`api-tests`** — Trigger: push/PR em `main` ou `develop`
-1. Instalar dependências (cache por `yarn.lock`)
-2. Copiar `.env.example` → `.env` quando disponível
-3. Executar todos os testes de API
-4. Publicar resultados Allure como artifact (retidos 7 dias)
-
-**`mobile-android`** — Trigger: push/PR em `main` ou `develop`
-1. Instalar dependências (cache por `yarn.lock`)
-2. Copiar `.env.example` → `.env` quando disponível
-3. Baixar APK (cache por versão)
-4. Habilitar KVM + instalar `adb`
-5. Subir `docker-compose` com emulador Android
-6. Aguardar boot do emulador e disponibilidade do Appium
-7. Executar testes Android
-8. Publicar resultados Allure como artifact (retidos 7 dias)
-
-**`publish-reports`** — Executa após ambos os jobs (mesmo em falha)
-1. Restaurar histórico Allure de execuções anteriores (branch `gh-pages`)
-2. Gerar relatórios Allure para API e Android
-3. Gerar página index com status de cada suite e links para os reports
-4. Deploy no GitHub Pages
-
-### Relatórios no GitHub Pages
-
-```
-https://<usuario>.github.io/<repositorio>/api/report/
-https://<usuario>.github.io/<repositorio>/android/report/
-```
 ---
 
 ## Stack Tecnológica
@@ -305,16 +290,11 @@ https://<usuario>.github.io/<repositorio>/android/report/
 |---|---|
 | Linguagem | TypeScript 5 |
 | Testes de API | Supertest + Mocha + Chai |
+| Schema Validation | **Zod 3** — tipos + validação numa definição só |
 | Testes Mobile | WebdriverIO v8 + Appium 2 |
 | Driver Android | UiAutomator2 |
+| Driver iOS | XCUITest |
 | Relatórios | Mochawesome + Allure Report |
 | CI/CD | GitHub Actions |
 | Gerenciador de pacotes | Yarn 1.x (Workspaces) |
 
----
-
-## App de Demonstração
-
-Os testes mobile utilizam o **WebdriverIO Native Demo App**, mantido pela equipe WebdriverIO para fins de automação, é necessário que faça o download da versão 2.0.0 e seja adicionado na pasta apps dentro de mobile-tests.
-
-- Repositório: https://github.com/webdriverio/native-demo-app

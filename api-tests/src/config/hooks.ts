@@ -1,3 +1,4 @@
+/// <reference types="mocha" />
 import addContext from 'mochawesome/addContext';
 import { attachment } from 'allure-js-commons';
 import { ApiUtils } from '../utils/api.utils';

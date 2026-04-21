@@ -1,9 +1,6 @@
 import { Response } from 'supertest';
 import { HttpClient } from './http.client';
-import {
-  CreateUserPayload,
-  UpdateUserPayload
-} from '@schemas/user.types';
+import { CreateUserPayload, UpdateUserPayload } from '@schemas/user.schema';
 
 export class UserService extends HttpClient {
   constructor() {
@@ -18,9 +15,7 @@ export class UserService extends HttpClient {
     return this.get('', query);
   }
 
-  /**
-   * GET /auth/users — Lista usuários via endpoint protegido (requer Bearer token).
-   */
+  /** GET /auth/users — Lista usuários via endpoint protegido (requer Bearer token). */
   async getAllUsersAuth(token: string, limit?: number, skip?: number): Promise<Response> {
     const query: Record<string, number> = {};
     if (limit !== undefined) query.limit = limit;
@@ -39,8 +34,8 @@ export class UserService extends HttpClient {
   }
 
   /** POST /users/add — Cria um novo usuário. */
-  async createUser(payload: CreateUserPayload): Promise<Response> {
-    return this.post('/add', payload);
+  async createUser(payload: CreateUserPayload | Record<string, unknown>): Promise<Response> {
+    return this.post('/add', payload as object);
   }
 
   /** PUT /users/:id — Atualiza um usuário pelo ID. */

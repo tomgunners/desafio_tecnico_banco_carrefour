@@ -7,12 +7,25 @@ export class LoginScreen extends BasePage {
 
   async waitForScreen(): Promise<void> {
     await this.tap(LoginLocators.loginMenu);
+    await this.waitForDisplayed(LoginLocators.usernameField);
   }
 
   async login(credentials: UserCredentials): Promise<void> {
     await this.fill(LoginLocators.usernameField, credentials.username);
     await this.fill(LoginLocators.passwordField, credentials.password);
     await this.tap(LoginLocators.loginButton);
+  }
+
+  // Melhoria #07: método para limpar campos sem recriar sessão
+  async clearFields(): Promise<void> {
+    try {
+      const emailEl = await $(LoginLocators.usernameField);
+      const passEl  = await $(LoginLocators.passwordField);
+      if (await emailEl.isDisplayed()) await emailEl.clearValue();
+      if (await passEl.isDisplayed())  await passEl.clearValue();
+    } catch {
+      // Campos não visíveis — sem problema
+    }
   }
 
   async verifyLoginSuccess(): Promise<void> {
@@ -36,9 +49,8 @@ export class LoginScreen extends BasePage {
       this.isDisplayed(LoginLocators.passwordErrorMessage),
     ]);
 
-    if (emailVisible) return this.getText(LoginLocators.emailErrorMessage);
+    if (emailVisible)    return this.getText(LoginLocators.emailErrorMessage);
     if (passwordVisible) return this.getText(LoginLocators.passwordErrorMessage);
-
     return '';
   }
 
@@ -47,11 +59,10 @@ export class LoginScreen extends BasePage {
       this.isDisplayed(LoginLocators.emailErrorMessage),
       this.isDisplayed(LoginLocators.passwordErrorMessage),
     ]);
-
     return emailVisible || passwordVisible;
   }
 
   async isActive(): Promise<boolean> {
-    return this.isDisplayed(LoginLocators.loginButton);
+    return this.isDisplayed(LoginLocators.usernameField);
   }
 }
