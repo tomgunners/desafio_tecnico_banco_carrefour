@@ -21,6 +21,18 @@ export class FormsScreen extends BasePage {
 
   // ── Switch ────────────────────────────────────────────────────────────────────
 
+  /**
+   * Garante que o switch está no estado inativo antes de um teste.
+   * Chamado no beforeEach — evita que o estado residual do teste anterior
+   * cause falsos negativos quando o switch já está no estado errado.
+   */
+  async resetSwitchToInactive(): Promise<void> {
+    const isActive = await this.isSwitchActive();
+    if (isActive) {
+      await this.tapSwitch();
+    }
+  }
+
   async tapSwitch(): Promise<void> {
     await this.tap(FormsLocators.switchToggle);
   }

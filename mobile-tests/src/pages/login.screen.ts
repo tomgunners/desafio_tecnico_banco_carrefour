@@ -10,6 +10,25 @@ export class LoginScreen extends BasePage {
     await this.waitForDisplayed(LoginLocators.usernameField);
   }
 
+  /**
+   * Fecha qualquer dialog/overlay aberto usando o botão Voltar do Android.
+   * Necessário após login bem-sucedido, que exibe um dialog de confirmação
+   * que bloqueia a navegação da barra inferior.
+   * Falha silenciosa — se não houver dialog, não causa erro.
+   */
+  async dismissOpenDialog(): Promise<void> {
+    try {
+      const dialogVisible = await this.isDisplayed(LoginLocators.successContainer);
+      if (dialogVisible) {
+        await browser.back();
+        // Aguarda o dialog fechar antes de continuar
+        await browser.pause(500);
+      }
+    } catch {
+      // Sem dialog aberto — sem problema
+    }
+  }
+
   async login(credentials: UserCredentials): Promise<void> {
     await this.fill(LoginLocators.usernameField, credentials.username);
     await this.fill(LoginLocators.passwordField, credentials.password);

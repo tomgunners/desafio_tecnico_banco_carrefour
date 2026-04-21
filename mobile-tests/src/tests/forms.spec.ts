@@ -12,9 +12,12 @@ describe('Formulários', () => {
     await forms.waitForScreen();
   });
 
-  // Reset leve: volta para a tela de Forms sem recriar sessão
+  // Reset leve: volta para a tela de Forms sem recriar sessão.
+  // Inclui reset explícito do switch para o estado inativo (padrão),
+  // pois o estado do componente persiste entre testes na mesma sessão.
   beforeEach(async () => {
     await forms.waitForScreen();
+    await forms.resetSwitchToInactive();
   });
 
   // ── Campo de texto ────────────────────────────────────────────────────────────

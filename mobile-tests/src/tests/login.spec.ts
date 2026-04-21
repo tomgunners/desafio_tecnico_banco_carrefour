@@ -18,13 +18,23 @@ describe('Login', () => {
     await login.waitForScreen();
   });
 
-  // Reset leve: navega de volta à tela de login sem recriar sessão
+  // Reset leve entre testes — sem recriar sessão Appium.
+  // Ordem importante:
+  //   1. Fechar qualquer dialog aberto (ex: dialog de sucesso após login)
+  //   2. Verificar se a tela de login está visível
+  //   3. Navegar para login se necessário (barra inferior)
+  //   4. Limpar os campos
   beforeEach(async () => {
-    // Garante que está na tela de login — navega pelo menu se necessário
+    // Passo 1: dismiss de dialog de sucesso que bloqueia a navegação
+    await login.dismissOpenDialog();
+
+    // Passo 2 e 3: navegar para login se não estiver na tela
     const isOnLogin = await login.isActive();
     if (!isOnLogin) {
       await home.goToLogin();
     }
+
+    // Passo 4: limpar campos para estado neutro
     await login.clearFields();
   });
 
