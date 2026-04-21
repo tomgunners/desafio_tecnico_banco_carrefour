@@ -1,1 +1,1 @@
-{"total":0,"items":[]}
+{"total":2,"items":[{"uid":"68369c889e65557d2ea94edf608aeebe","name":"Users API","statistic":{"failed":0,"broken":0,"skipped":0,"passed":21,"unknown":0,"total":21}},{"uid":"7ee15df4d068258897f47cf34c7804d2","name":"Auth API — Autenticação JWT","statistic":{"failed":0,"broken":0,"skipped":0,"passed":12,"unknown":0,"total":12}}]}
