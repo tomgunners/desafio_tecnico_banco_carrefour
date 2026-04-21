@@ -1,1 +1,1 @@
-[{"values":["https://dummyjson.com"],"name":"API.BaseUrl"},{"values":["CI/CD"],"name":"Execution.Type"},{"values":["QA"],"name":"Environment"},{"values":["v22.22.2"],"name":"Node.Version"},{"values":["Linux 6.17.0-1011-azure"],"name":"OS"},{"values":["runnervm04xxt"],"name":"Machine"}]
+[{"values":["https://dummyjson.com"],"name":"API.BaseUrl"},{"values":["CI/CD"],"name":"Execution.Type"},{"values":["QA"],"name":"Environment"},{"values":["v22.22.2"],"name":"Node.Version"},{"values":["Linux 6.17.0-1010-azure"],"name":"OS"},{"values":["runnervmeorf1"],"name":"Machine"}]
